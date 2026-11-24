@@ -26,7 +26,7 @@
     setTimeout(() => URL.revokeObjectURL(a.href), 60000);
   }
   // 標題用 600、副標和鏡頭文字用 400／500，三種粗細都要先載好，匯出的第一格才不會是替代字型
-  const fontsReady = () => Promise.all(["Noto Serif TC", "Noto Sans TC", "LXGW WenKai TC"].flatMap((f) => [400, 500, 600].map((w) => document.fonts.load(`${w} 40px "${f}"`, "FFXIV 庭園夜 " + [S().title.main, S().title.sub, S().title.info, S().ending.main].join("")).catch(() => {}))));
+  const fontsReady = () => Promise.all(["Noto Serif TC", "Noto Sans TC", "LXGW WenKai TC"].flatMap((f) => [400, 500, 600, 700, 900].map((w) => document.fonts.load(`${w} 40px "${f}"`, "FFXIV 庭園夜 " + [S().title.main, S().title.sub, S().title.info, S().ending.main].join("")).catch(() => {}))));
 
   /* ---------- 匯入素材 ---------- */
   /* handles：同順序的檔案捷徑（有的話記下來，下次可以直接找回檔案） */
@@ -263,7 +263,7 @@
       if (k === "start") x.start = Math.max(0, v);
       else if (k === "dur") x.dur = Math.max(0.5, v);
       else if (k === "toEnd") x.dur = v ? 0 : +(total - (x.start || 0)).toFixed(2);
-      else x[k] = v;
+      else { x[k] = v; if (k === "style") x.styleSet = true; }
     } else if (kind === "music") { const M = S_.music; if (k === "len") M.len = Math.max(1, v); else M[k] = k === "vol" ? v : Math.max(0, v); }
     else if (kind === "title") S_.title[k] = Math.max(k === "dur" ? 2 : 0, v);
     else if (kind === "ending") S_.ending.dur = Math.max(2, v);
@@ -635,6 +635,7 @@
     R.stop();
     HC.autoEdit();
     afterNewTimeline();
+    HC.tasteAfterAuto && HC.tasteAfterAuto();
     if (!silent) toast(`自動剪輯完成：${S().shots.length} 個鏡頭，${HC.fmt(HC.timeline().total)}` + (HC.lastDedupe ? `（去掉 ${HC.lastDedupe} 個重複角度）` : ""));
   }
   function afterNewTimeline() {
@@ -787,7 +788,7 @@
     if (o.title && o.title.show === false) s.title.template = "none";
     if (o.ending) Object.assign(s.ending, o.ending);
     if (o.wm) Object.assign(s.wm, o.wm);
-    if (o.look) { s.look.filter = o.look.filter || "none"; s.look.filterStr = o.look.filterStr ?? 1; s.look.tintStr = o.look.tintStr ?? 1; Object.assign(s.look.fx, o.look.fx || {}); }
+    if (o.look) { s.look.filter = o.look.filter || "none"; s.look.filterStr = o.look.filterStr ?? 1; s.look.tintStr = o.look.tintStr ?? 1; Object.assign(s.look.fx, o.look.fx || {}); s.look.text = o.look.text || null; s.look.kit = o.look.kit || ""; }
     if (s.title.pos === "center") s.title.pos = "auto";   // 舊版的「畫面中央」= 現在的「跟模板一樣」
     Object.assign(s.music, { vol: o.music.vol, off: o.music.off, fade: o.music.fade, at: o.music.at || 0, len: o.music.len || 0 });
     s.texts = o.texts || []; s.fxItems = o.fxItems || [];
@@ -825,7 +826,7 @@
     $("aTol").value = Math.round(s.auto.tol * 100); $("aHead").value = s.auto.head; $("aCursor").checked = s.auto.cursor;
     $("aSceneLook").value = Math.round((s.auto.sceneLook ?? 0.5) * 100);
     $("aUI").checked = s.auto.ui; $("aStab").checked = s.auto.stab; $("aStabStr").value = Math.round(s.auto.stabStr * 100); $("aLearn").checked = s.auto.learn; $("aCover").checked = s.auto.cover; $("aLateral").checked = s.auto.lateral; $("aBeat").checked = s.auto.beat !== false; $("aGap").value = s.auto.gap;
-    $("aFitMusic").checked = s.auto.fitMusic !== false; $("aDedupe").checked = s.auto.dedupe !== false; $("aDayNight").checked = s.auto.dayNight !== false; $("mBest").checked = s.music.autoSec !== false;
+    $("aFitMusic").checked = s.auto.fitMusic !== false; $("aDedupe").checked = s.auto.dedupe !== false; $("aTaste").checked = s.auto.taste !== false; HC.renderTaste && HC.renderTaste(); $("aDayNight").checked = s.auto.dayNight !== false; $("mBest").checked = s.music.autoSec !== false;
     $("mVol").value = Math.round(s.music.vol * 100); $("mOff").value = s.music.off; $("mFade").value = s.music.fade;
     $("oAspect").value = s.out.aspect || "16:9"; applyAspect();
     $("oPreset").value = s.out.preset || ""; $("oProxy").checked = !!s.out.proxy;
@@ -1199,6 +1200,7 @@
     const afterHistory = () => { syncForms(); renderTimeline(); select(cur() ? sel : null); refresh(); };
     $("undoBtn").onclick = () => { if (HC.undo()) afterHistory(); };
     $("redoBtn").onclick = () => { if (HC.redo()) afterHistory(); };
+    HC.initTaste({ toast, changed: () => { syncForms(); renderTimeline(); refresh(); } });
     HC.initProjects({ projectJSON, loadProject, setMusic, toast, saveFile, addFiles, getName: () => $("projName").value, setName: (v) => { $("projName").value = v; }, clearMusic: () => S().music.url && $("mClear").click() });
     $("exportBtn").onclick = doExport; $("exportBtn2").onclick = doExport;
 
@@ -1568,6 +1570,7 @@
     bindVal("aLen", (t) => { A().len = +t.value; A().lenSet = true; });   // 你自己調過長度，就不再用學到的長度蓋掉
     bindVal("aFitMusic", (t) => A().fitMusic = t.checked, "change");
     bindVal("aDedupe", (t) => A().dedupe = t.checked, "change");
+    bindVal("aTaste", (t) => A().taste = t.checked, "change");
     bindVal("aDayNight", (t) => A().dayNight = t.checked, "change");
     bindVal("mBest", (t) => { S().music.autoSec = t.checked; if (t.checked) bestSection(true); }, "change");
     $("recBtn").onclick = async () => {

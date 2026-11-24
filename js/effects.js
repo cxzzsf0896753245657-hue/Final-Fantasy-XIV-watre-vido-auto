@@ -293,11 +293,12 @@ function installEffects() {
     const u = Math.min(W, H) / 1080, size = o.size * u * (W < H ? 0.9 : 1), sub = Math.round(size * 0.43), info = Math.round(size * 0.32);
     const font = (w, s) => `${w} ${s}px "${o.font}", "Noto Serif TC", serif`;
     const lines = [];
-    const mk = (text, w, s) => { ctx.font = font(w, s); const chars = [...(text || "")]; let x = 0; const out = chars.map((ch) => { const c = { ch, x0: x }; x += ctx.measureText(ch).width; return c; }); return { chars: out, width: x, font: font(w, s), size: s }; };
-    const L1 = mk(o.main, 600, size), L2 = mk(o.sub, 400, sub), L3 = mk(o.info, 400, info);
+    // 字距：大字緊一點、小字拉開（o.track，單位 em；美感組合會設定）
+    const mk = (text, w, s, tr = 0) => { ctx.font = font(w, s); const chars = [...(text || "")]; let x = 0; const out = chars.map((ch) => { const c = { ch, x0: x }; x += ctx.measureText(ch).width + tr * s; return c; }); return { chars: out, width: Math.max(0, x - (chars.length ? tr * s : 0)), font: font(w, s), size: s }; };
+    const L1 = mk(o.main, o.weight || 600, size, o.trackMain || 0), L2 = mk(o.sub, o.subWeight || 400, sub, o.track || 0), L3 = mk(o.info, o.subWeight || 400, info, o.track || 0);
     let x, y, align = "center";
     switch (tpl.layout) {   // 模板預設的位置
-      case "lowleft": x = W * 0.07; y = H * 0.70; align = "left"; break;
+      case "lowleft": x = W * 0.08; y = H * 0.70; align = "left"; break;
       case "left": x = W * 0.09; y = H * 0.44; align = "left"; break;
       case "cinema": x = W / 2; y = H * 0.74; break;
       default: x = W / 2; y = H * 0.42;
@@ -307,7 +308,7 @@ function installEffects() {
     if (P === "top") y = H * (tpl.bars ? 0.24 : 0.2);
     else if (P === "middle") y = H * 0.42;
     else if (P === "bottom") y = H * (tpl.bars ? 0.74 : 0.72);
-    else if (P === "lowleft") { y = H * 0.72; x = W * 0.07; align = "left"; }
+    else if (P === "lowleft") { y = H * 0.72; x = W * 0.08; align = "left"; }
     const left = (L) => align === "left" ? x : x - L.width / 2;
     lines.push({ ...L1, x: left(L1), y });
     let yy = y + size * 0.55;
@@ -333,7 +334,9 @@ function installEffects() {
       tl = G().timeline({ paused: true });
       // 空的目標（例如沒有副標）直接略過，GSAP 才不會報錯
       const empty = (t) => Array.isArray(t) && !t.flat().length;
-      const w = { from: (t, v, p) => (empty(t) ? w : (tl.from(t, v, p), w)), to: (t, v, p) => (empty(t) ? w : (tl.to(t, v, p), w)), set: (t, v, p) => (empty(t) ? w : (tl.set(t, v, p), w)), fromTo: (t, a, b, p) => (empty(t) ? w : (tl.fromTo(t, a, b, p), w)) };
+      // 克制的動態（o.calm）：不回彈、不過衝，進場最多 1.1 秒（taste-skill 的動態規則）
+      const cv = (v) => { if (!o.calm || !v) return v; const e = String(v.ease || ""); const n = { ...v }; if (/back|elastic|bounce/.test(e)) n.ease = "expo.out"; if (n.duration > 1.1) n.duration = 1.1; return n; };
+      const w = { from: (t, v, p) => (empty(t) ? w : (tl.from(t, cv(v), p), w)), to: (t, v, p) => (empty(t) ? w : (tl.to(t, cv(v), p), w)), set: (t, v, p) => (empty(t) ? w : (tl.set(t, v, p), w)), fromTo: (t, a, b, p) => (empty(t) ? w : (tl.fromTo(t, a, cv(b), p), w)) };
       tpl.build(w, g, d, keep);
       // 勾了「標題下加細線」但模板本身沒有線的動畫：線跟著標題一起畫出來，不要一開始就整條出現
       if (o.line && !tpl.line && !tpl.bar && !tpl.cursor) w.from(g.line, { scaleX: 0, duration: 0.9, ease: "power2.inOut" }, 1.2);
@@ -352,7 +355,7 @@ function installEffects() {
     const d = o.dur;
     if (!keep && t > d + 0.1) return;
     const L = layout(ctx, W, H, o, tpl);
-    const key = JSON.stringify([o.template, o.main, o.sub, o.info, o.font, o.size, o.pos, o.line, d, keep, W, H]);
+    const key = JSON.stringify([o.template, o.main, o.sub, o.info, o.font, o.size, o.pos, o.line, d, keep, W, H, o.weight, o.subWeight, o.track, o.trackMain, o.calm]);
     const { tl, g } = getTimeline(key, o, tpl, d, keep, L);
     if (tl) tl.seek(clamp(t, 0, tl.duration() || d));
     else { const a = clamp(Math.min(t - 0.6, keep ? 1 : d - t), 0, 1); g.group.opacity = a; }
@@ -362,6 +365,12 @@ function installEffects() {
     ctx.save();
     const cx = L.align === "left" ? L.x : W / 2, cy = L.y - L.size * 0.3;
     ctx.translate(cx + G0.x * u, cy + G0.y * u); ctx.scale(G0.scale, G0.scale); ctx.translate(-cx, -cy);
+    if (o.box) {   // 實心底框：背景太亮或太花時（美感檢查會建議）
+      const ls = L.lines.filter((l) => l.chars.length), x0 = Math.min(...ls.map((l) => l.x)), x1 = Math.max(...ls.map((l) => l.x + l.width)), last = ls[ls.length - 1];
+      const pad = L.size * 0.4;
+      ctx.globalAlpha = G0.opacity; ctx.fillStyle = "rgba(14,14,16,.62)";
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x0 - pad, L.y - L.size * 1.05, x1 - x0 + pad * 2, last.y + last.size * 0.45 - (L.y - L.size * 1.05), 10 * u) : ctx.rect(x0 - pad, L.y - L.size * 1.05, x1 - x0 + pad * 2, last.y + last.size * 0.45 - (L.y - L.size * 1.05)); ctx.fill();
+    }
     ctx.textBaseline = "alphabetic"; ctx.textAlign = "left";
     ctx.shadowColor = "rgba(0,0,0,.55)"; ctx.shadowBlur = 8 * u; ctx.shadowOffsetX = 2 * u; ctx.shadowOffsetY = 2 * u;
     ctx.fillStyle = o.color || "#fff";
@@ -380,6 +389,7 @@ function installEffects() {
     L.lines.forEach((ln, li) => {
       const tg = groups[li] || [];
       ctx.font = ln.font;
+      ctx.fillStyle = li && o.subColor ? o.subColor : o.color || "#fff";
       ln.chars.forEach((c, i) => {
         const s = tg[i]; if (!s || s.opacity <= 0.001) return;
         ctx.globalAlpha = G0.opacity * s.opacity;
@@ -398,23 +408,33 @@ function installEffects() {
   HC.drawCaption = (ctx, W, H, text, lt, od, font, o = {}) => {
     const fin = Math.min(0.5, od / 4), a = clamp(Math.min(lt / fin, (od - lt) / fin), 0, 1);
     if (a <= 0 || !text) return;
-    const u = Math.min(W, H) / 1080, style = o.style || "caption";
+    const u = Math.min(W, H) / 1080, style = o.style || "caption", ink = o.color || "#fff", tr = o.track || 0;
     const y = o.pos === "top" ? H * 0.16 : o.pos === "bottom" ? H * 0.84 : H * 0.47;
+    // 字距：一個字一個字畫
+    const spaced = (t, x, yy, sz) => { if (!tr) return ctx.fillText(t, x, yy); const cs = [...t], ws = cs.map((c) => ctx.measureText(c).width), tot = ws.reduce((p, q) => p + q, 0) + tr * sz * (cs.length - 1); let xx = x - tot / 2; ctx.textAlign = "left"; cs.forEach((c, i) => { ctx.fillText(c, xx, yy); xx += ws[i] + tr * sz; }); ctx.textAlign = "center"; };
+    const widthOf = (t, sz) => ctx.measureText(t).width + (tr ? tr * sz * ([...t].length - 1) : 0);
     ctx.save();
     ctx.globalAlpha = a * 0.95; ctx.textAlign = "center"; ctx.textBaseline = "middle";
     if (style === "lower") {
-      const fs = 46 * u; ctx.font = `500 ${fs}px "Noto Sans TC", sans-serif`;
-      const w = Math.max(ctx.measureText(text).width, o.sub ? (ctx.font = `400 ${fs * 0.6}px "Noto Sans TC", sans-serif`, ctx.measureText(o.sub).width) : 0) + 60 * u;
+      const fs = 46 * u, wM = o.weight || 500; ctx.font = `${wM} ${fs}px "Noto Sans TC", sans-serif`;
+      const w = Math.max(ctx.measureText(text).width, o.sub ? (ctx.font = `400 ${fs * 0.6}px "Noto Sans TC", sans-serif`, widthOf(o.sub, fs * 0.6)) : 0) + 60 * u;
       const h = (o.sub ? fs * 1.9 : fs * 1.3) + 16 * u, yy = (o.pos ? y : H * 0.84) - h / 2;
       ctx.fillStyle = "rgba(10,10,14,.6)"; ctx.fillRect(W / 2 - w / 2, yy, w, h);
-      ctx.fillStyle = "#fff"; ctx.font = `500 ${fs}px "Noto Sans TC", sans-serif`; ctx.fillText(text, W / 2, yy + (o.sub ? fs * 0.75 : h / 2) + 4 * u);
-      if (o.sub) { ctx.fillStyle = "rgba(255,255,255,.8)"; ctx.font = `400 ${fs * 0.6}px "Noto Sans TC", sans-serif`; ctx.fillText(o.sub, W / 2, yy + fs * 1.55 + 4 * u); }
+      if (o.accent) { ctx.fillStyle = o.accent; ctx.fillRect(W / 2 - w / 2, yy, 4 * u, h); }
+      ctx.fillStyle = ink; ctx.font = `${wM} ${fs}px "Noto Sans TC", sans-serif`; ctx.fillText(text, W / 2, yy + (o.sub ? fs * 0.75 : h / 2) + 4 * u);
+      if (o.sub) { ctx.globalAlpha = a * 0.8; ctx.font = `400 ${fs * 0.6}px "Noto Sans TC", sans-serif`; spaced(o.sub, W / 2, yy + fs * 1.55 + 4 * u, fs * 0.6); }
     } else {
-      const fs = (style === "big" ? 130 : 88) * u;
-      ctx.shadowColor = "rgba(0,0,0,.6)"; ctx.shadowBlur = 8 * u; ctx.shadowOffsetX = 2 * u; ctx.shadowOffsetY = 2 * u;
-      ctx.fillStyle = "#fff"; ctx.font = `${style === "big" ? 700 : 500} ${fs}px "${font}", serif`;
+      const fs = (style === "big" ? 130 : 88) * u, wM = o.weight || (style === "big" ? 700 : 500);
+      ctx.font = `${wM} ${fs}px "${font}", serif`;
+      if (o.box) {   // 實心底框（畫面太亮或太花時，讓字看得清楚）
+        const tw = ctx.measureText(text).width; let sw = 0;
+        if (o.sub) { ctx.font = `400 ${fs * 0.36}px "Noto Sans TC", sans-serif`; sw = widthOf(o.sub, fs * 0.36); ctx.font = `${wM} ${fs}px "${font}", serif`; }
+        const bw = Math.max(tw, sw) + fs * 0.8, bh = fs * (o.sub ? 1.75 : 1.35);
+        ctx.fillStyle = "rgba(14,14,16,.62)"; rr(ctx, W / 2 - bw / 2, y - fs * 0.68, bw, bh, 8 * u); ctx.fill();
+      } else { ctx.shadowColor = "rgba(0,0,0,.6)"; ctx.shadowBlur = 8 * u; ctx.shadowOffsetX = 2 * u; ctx.shadowOffsetY = 2 * u; }
+      ctx.fillStyle = ink;
       ctx.fillText(text, W / 2, y);
-      if (o.sub) { ctx.font = `400 ${fs * 0.36}px "Noto Sans TC", sans-serif`; ctx.fillStyle = "rgba(255,255,255,.85)"; ctx.fillText(o.sub, W / 2, y + fs * 0.75); }
+      if (o.sub) { ctx.font = `400 ${fs * 0.36}px "Noto Sans TC", sans-serif`; ctx.globalAlpha = a * 0.85; spaced(o.sub, W / 2, y + fs * 0.75, fs * 0.36); }
     }
     ctx.restore();
   };

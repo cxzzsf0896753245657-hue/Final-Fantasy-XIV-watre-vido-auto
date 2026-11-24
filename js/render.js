@@ -114,7 +114,7 @@
       // 暫停時不套片頭片尾的淡入淡出，才看得到畫面
       T, total, fi: still ? 0 : S.out.fi, fo: still ? 0 : S.out.fo, look: S.look, title: S.title, ending: S.ending, wm: S.wm,
       captions: [...S.shots.map((s, i) => s.text ? { text: s.text, start: starts[i], dur: HC.outDur(s) } : null).filter(Boolean),
-        ...(S.texts || []).map((t) => { const [a, b] = HC.textSpan(t, null, total); return { text: t.text, sub: t.sub, style: t.style, pos: t.pos, start: a, dur: b - a }; })],
+        ...(S.texts || []).map((t) => { const [a, b] = HC.textSpan(t, null, total); const k = S.look.text || {}; return { text: t.text, sub: t.sub, style: t.style, pos: t.pos, start: a, dur: b - a, color: t.color || k.color, accent: k.accent, weight: k.weight, track: k.track, box: t.box ?? false }; })],
       fxItems: S.fxItems || [],
     };
   };

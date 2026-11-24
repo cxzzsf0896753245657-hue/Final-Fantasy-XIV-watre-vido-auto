@@ -93,7 +93,7 @@
       }
       if (s.split) info.splits.push({ start: r3(starts[i]), dur: r3(od), labels: s.split.labels || ["白天", "夜晚"] });
     });
-    const fonts = [S.title.font, "Noto Serif TC"];
+    const fonts = [...new Set([S.title.font, "Noto Serif TC", "Noto Sans TC"])];
     const textForFonts = [S.title.main, S.title.sub, S.title.info, S.ending.main, S.ending.sub, ...shots.map((s) => s.text || ""), ...(S.texts || []).map((t) => t.text + (t.sub || ""))].join("");
 
     const clipsHtml = shots.map((s, i) => {
@@ -137,7 +137,7 @@ ${vids}${sp}
 <title>${esc(name)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@400;500;600&family=LXGW+WenKai+TC&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Serif+TC:wght@400;600;900&family=LXGW+WenKai+TC&display=swap" rel="stylesheet" />
 <script src="${GSAP_URL}"></script>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -199,7 +199,7 @@ function build() {
   tl.seek(0);
 }
 // 等字型載入完才註冊時間軸，第一格的標題字型才會正確
-Promise.all(FONTS.map((f) => document.fonts.load('600 84px "' + f + '"', TEXT || "A"))).catch(() => {}).then(build);
+Promise.all(FONTS.flatMap((f) => [400, 500, 600, 700, 900].map((w) => document.fonts.load(w + ' 84px "' + f + '"', TEXT || "A").catch(() => {})))).then(build);
 </script>
 </body>
 </html>

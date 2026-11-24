@@ -397,3 +397,28 @@ body.nosel, body.nosel * { user-select: none !important; -webkit-user-select: no
 .pjhead input[type=search]{flex:1 1 240px;width:auto}
 .pjhead select{width:auto;min-width:120px}
 .pjempty{grid-column:1/-1}
+/* 美感 */
+.tastebox{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:14px;background:rgba(255,255,255,.02)}
+.tastebox .sec{margin-top:0}
+.kits{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}
+.kit{display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:1px solid var(--line);border-radius:7px;padding:4px 3px;color:var(--ink);font:inherit;font-size:11px;line-height:1.2;cursor:pointer;white-space:nowrap;min-width:0}
+.kit:hover{border-color:rgba(255,255,255,.3)}
+.kit.on{border-color:var(--accent);background:rgba(143,211,180,.08)}
+.kit .sw{position:relative;width:100%;aspect-ratio:16/9;border-radius:5px;display:flex;align-items:center;justify-content:center}
+.kit .sw b{font-size:16px;line-height:1}
+.kit .sw i{position:absolute;left:5px;right:5px;bottom:4px;height:2px;border-radius:2px}
+.tscore{display:flex;align-items:center;gap:8px;margin:10px 0 6px;flex-wrap:wrap}
+.tscore b{font-size:26px;font-variant-numeric:tabular-nums}
+.tscore .btn{margin-left:auto}
+.titem{display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--line);font-size:13px}
+.titem .lv{flex:none;font-size:11px;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,.08)}
+.titem.bad .lv{background:rgba(255,143,133,.18);color:#ff8f85}
+.titem.warn .lv{background:rgba(233,196,106,.18);color:#e9c46a}
+.titem .msg{flex:1;display:flex;flex-direction:column;gap:2px}
+.titem .msg small{color:var(--mute);font-size:11px}
+.titem .btn{flex:none;font-size:12px;padding:4px 8px;min-height:28px}
+.tsrclist{list-style:none;padding:0;margin:0 0 12px;display:flex;flex-direction:column;gap:8px}
+.tsrc{border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px}
+.tsrc .sub{display:block;color:var(--mute);font-size:12px;margin:2px 0 4px;word-break:break-all}
+.tsrc .sub a{color:inherit}
+.tsrc ul{margin:0;padding-left:18px;color:var(--mute);font-size:12px;line-height:1.6}

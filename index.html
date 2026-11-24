@@ -6,7 +6,7 @@
 <title>房屋影片自動剪輯</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@400;600&family=LXGW+WenKai+TC&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Serif+TC:wght@400;600;900&family=LXGW+WenKai+TC&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
 </head>
@@ -201,6 +201,7 @@
       <label class="check"><input id="aLateral" type="checkbox" checked> 優先挑橫向移動的運鏡</label>
       <label class="check"><input id="aBeat" type="checkbox" checked> 剪接點對齊音樂拍點（有選背景音樂時）</label>
       <label class="check"><input id="aDedupe" type="checkbox" checked> 去掉角度幾乎一樣的重複畫面</label>
+      <label class="check"><input id="aTaste" type="checkbox" checked> 自動配美感（依畫面挑配色和字體；你常修的美感問題直接修好）</label>
       <label class="check"><input id="aDayNight" type="checkbox" checked> 白天的場景排前面、夜晚排後面</label>
       <label>拍攝時間相隔超過幾分鐘，就算不同場景<input id="aGap" type="number" value="8" min="0" step="1"></label>
       <label>畫面換場景的判斷靈敏度 <output id="aSceneV"></output><input id="aSceneLook" type="range" min="0" max="100" step="5" value="50"></label>
@@ -228,6 +229,13 @@
     </div>
 
     <div class="pane" id="pane-title">
+      <section id="tasteBox" class="tastebox">
+        <h3 class="sec">美感 <small class="muted">配色、字體、排版一次配好</small></h3>
+        <div class="kits" id="kitList"></div>
+        <p class="hint" id="kitWhy">點一組套用（只改樣式，不改你打的字）。配色出自 Taste Skill，字的層次和邊距來自 Skillry 的 Opus 5.5 影片集。</p>
+        <div class="btnrow"><button class="btn" id="kitDeal">依畫面自動挑</button><button class="btn primary" id="tasteCheckBtn">美感檢查</button></div>
+        <div id="tasteResult"></div>
+      </section>
       <h3 class="sec">開頭</h3>
       <div class="tiles" id="tTiles"></div>
       <label>主標題<input id="tMain" type="text" value="FFXIV HOUSING"></label>
@@ -319,6 +327,9 @@
       <div class="learned" id="lSummary"></div>
       <button class="btn primary wide" id="lEdit">記住這次的修改</button>
       <p class="hint">匯出影片時也會自動記住。</p>
+      <h3 class="sub">美感來源</h3>
+      <p class="hint">自動剪輯的配色、字體、排版和「美感檢查」學自這些來源，可以個別關掉。</p>
+      <ul id="tasteSrc" class="tsrclist"></ul>
       <label class="btn wide" for="refIn">加入參考影片（你喜歡的剪輯）</label>
       <input id="refIn" type="file" accept="video/*" multiple hidden>
       <p class="hint" id="lRefStatus">上傳別人剪好的房屋影片，會分析它的鏡頭長度、推近或平移的用法、黑場轉場的頻率。</p>
@@ -365,7 +376,7 @@
         <p><kbd>空白</kbd>／<kbd>K</kbd> 播放暫停 ・ <kbd>J</kbd> <kbd>L</kbd> 倒退／前進 2 秒 ・ <kbd>←</kbd> <kbd>→</kbd> 逐格（加 <kbd>Shift</kbd> 跳 1 秒）・ <kbd>Home</kbd> <kbd>End</kbd> 開頭／結尾<br>
         <kbd>S</kbd> 分割 ・ <kbd>Delete</kbd> 刪除 ・ <kbd>Ctrl</kbd>+<kbd>D</kbd> 複製 ・ <kbd>Ctrl</kbd>+<kbd>A</kbd> 全選 ・ <kbd>Ctrl</kbd>/<kbd>Shift</kbd>+點 多選 ・ <kbd>Ctrl</kbd>+<kbd>Z</kbd> 復原 ・ <kbd>Alt</kbd>+<kbd>C</kbd>／<kbd>V</kbd> 複製／貼上效果<br>
         拖鏡頭左右邊緣可以修剪長度，會自動吸附到播放位置和音樂拍點。拖鏡頭本身可以換順序；把左邊的素材、音樂庫的音樂／音效拖到時間軸上可以直接加入。文字、特效、音樂、環境音各有自己的軌，可以拖動位置、拖邊緣改長度。</p></details>
-      <div class="tladd"><button class="btn" id="addText" title="在播放位置加一段文字">＋ 文字</button><button class="btn" id="addFx" title="在播放位置加一段特效">＋ 特效</button></div>
+      <div class="tladd"><button class="btn" id="addText" title="在播放位置加一段文字">＋ 文字</button><button class="btn" id="addFx" title="在播放位置加一段特效">＋ 特效</button><button class="btn" id="tlTaste" title="檢查文字對比、配色、效果、轉場">✦ 美感檢查</button></div>
       <label class="zoom">縮放<input id="tlZoom" type="range" min="4" max="40" value="12" aria-label="時間軸縮放"></label>
     </div>
     <div class="tlscroll" id="tlScroll">
@@ -436,6 +447,7 @@
 <script src="js/vendor/webm-muxer.min.js"></script>
 <script src="js/mp4index.js"></script>
 <script src="js/export.js"></script>
+<script src="js/taste.js"></script>
 <script src="js/projects.js"></script>
 <script src="js/ui.js"></script>
 </body>
