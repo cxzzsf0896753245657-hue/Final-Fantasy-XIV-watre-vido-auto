@@ -4,7 +4,7 @@
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const MODE = { move: "原運鏡", in: "推近", out: "拉遠", panR: "右移", panL: "左移", panU: "上移", panD: "下移", none: "靜止" };
-  let sel = null, srcClip = null, pendingProject = null, analyzing = false;
+  let sel = null, srcClip = null, analyzing = false;
 
   /* ---------- 小工具 ---------- */
   const toast = (msg, ms = 2600) => { const t = $("toast"); t.textContent = msg; t.classList.add("on"); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("on"), ms); };
@@ -22,7 +22,8 @@
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 60000);
   }
-  const fontsReady = () => Promise.all(["Noto Serif TC", "Noto Sans TC", "LXGW WenKai TC"].map((f) => document.fonts.load(`600 40px "${f}"`, "FFXIV 庭園夜").catch(() => {})));
+  // 標題用 600、副標和鏡頭文字用 400／500，三種粗細都要先載好，匯出的第一格才不會是替代字型
+  const fontsReady = () => Promise.all(["Noto Serif TC", "Noto Sans TC", "LXGW WenKai TC"].flatMap((f) => [400, 500, 600].map((w) => document.fonts.load(`${w} 40px "${f}"`, "FFXIV 庭園夜 " + [S().title.main, S().title.sub, S().title.info, S().ending.main].join("")).catch(() => {}))));
 
   /* ---------- 匯入素材 ---------- */
   function addFiles(list) {
@@ -164,9 +165,8 @@
   /* ---------- 鏡頭設定 ---------- */
   function select(id) {
     sel = id;
-    srcClip = null;
+    if (srcClip) { srcClip = null; renderBin(); }   // 只有在關掉素材檢視時才需要重畫素材區
     $("srcPanel").classList.add("hidden");
-    renderBin();
     const s = S().shots.find((x) => x.id === id);
     $("shotEmpty").classList.toggle("hidden", !!s);
     $("shotForm").classList.toggle("hidden", !s);
@@ -343,7 +343,7 @@
       ["接法", st.order.n ? `靜止後接運鏡 ${Math.round((st.order.seq.SM || 0) * 100)}%・開場用${st.order.firstS >= 0.5 ? "靜止" : "運鏡"}` : "—"],
       ["換素材轉場", dist(st.tr.change)], ["換場景轉場", dist(st.tr.gap)],
       ["常用開頭", topName(P.look.opening, (k) => HC.titleTpl(k).name)], ["常用濾鏡", topName(P.look.filter, (k) => HC.filterInfo(k).name)],
-      ["常用效果", top || "—"],
+      ["推近平移比例", top || "—"],
     ].map(([a, b]) => `<dt>${a}</dt><dd>${esc(b)}</dd>`).join("") +
       `<span class="src">學習來源：手動修改 ${P.edits} 次 ・ 參考影片 ${P.refs.length} 支 ・ 鏡頭範例 ${ex} 個（好 ${good}／壞 ${ex - good}）${P.w ? " ・ 挑片段模型已啟用" : ex ? " ・ 範例再多一點就會啟用挑片段模型" : ""}</span>`;
     $("lRefs").innerHTML = P.refs.map((r, i) => `<li><span>${esc(r.name)}<span class="sub">${r.shots} 個鏡頭 ・ 平均 ${r.avg.toFixed(1)} 秒 ・ 黑場 ${Math.round(r.dips * 100)}% ・ 疊化 ${Math.round((r.fades || 0) * 100)}%</span></span><button data-ref="${i}" aria-label="移除這支參考影片的紀錄">✕</button></li>`).join("");
@@ -469,13 +469,15 @@
     });
 
     $("autoBtn").onclick = () => runAuto(); $("autoBtn2").onclick = () => runAuto();
-    $("undoBtn").onclick = () => { if (HC.undo()) { renderTimeline(); select(cur() ? sel : null); refresh(); } };
-    $("redoBtn").onclick = () => { if (HC.redo()) { renderTimeline(); select(cur() ? sel : null); refresh(); } };
+    // 復原也可能改到標題、片尾、濾鏡，所以表單一起更新
+    const afterHistory = () => { syncForms(); renderTimeline(); select(cur() ? sel : null); refresh(); };
+    $("undoBtn").onclick = () => { if (HC.undo()) afterHistory(); };
+    $("redoBtn").onclick = () => { if (HC.redo()) afterHistory(); };
     $("saveBtn").onclick = () => saveFile(($("projName").value || "housing") + ".json", projectJSON());
     $("projIn").addEventListener("change", async (e) => { const f = e.target.files[0]; e.target.value = ""; if (!f) return; try { loadProject(JSON.parse(await f.text())); } catch (err) { toast("專案檔讀取失敗"); } });
     $("exportBtn").onclick = doExport; $("exportBtn2").onclick = doExport;
 
-    $("playBtn").onclick = () => { if (R.isPlaying()) R.stop(); else { const { total } = HC.timeline(); R.play(R.T >= total - 0.05 ? 0 : R.T); } };
+    $("playBtn").onclick = () => { if (R.exporting) return; if (R.isPlaying()) R.stop(); else { const { total } = HC.timeline(); R.play(R.T >= total - 0.05 ? 0 : R.T); } };
     $("scrub").addEventListener("input", (e) => { const T = e.target.value / 10; movePlayhead(T); seek(T); });
 
     document.querySelectorAll(".tabs button").forEach((b) => b.onclick = () => showTab(b.dataset.tab));
@@ -628,7 +630,7 @@
     $("trAll").onclick = () => applyTr(S().shots.slice(1));
     $("trScenes").onclick = () => applyTr(S().shots.filter((s, i) => i && HC.boundaryKind(S().shots[i - 1], s, S().auto) === "gap"));
     // 開頭模板
-    $("tTiles").addEventListener("click", (e) => { const b = e.target.closest("[data-tpl]"); if (!b) return; HC.commit(); S().title.template = b.dataset.tpl; S().title.show = b.dataset.tpl !== "none"; renderTiles(); if (S().shots.length) { R.stop(); R.play(0); setTimeout(() => R.isPlaying() && R.T > S().title.dur + 1 && R.stop(), (S().title.dur + 1.5) * 1000); } });
+    $("tTiles").addEventListener("click", (e) => { const b = e.target.closest("[data-tpl]"); if (!b) return; HC.commit(); S().title.template = b.dataset.tpl; renderTiles(); if (S().shots.length) { R.stop(); R.play(0); setTimeout(() => R.isPlaying() && R.T > S().title.dur + 1 && R.stop(), (S().title.dur + 1.5) * 1000); } });
     // 濾鏡與特效
     $("fTiles").addEventListener("click", (e) => { const b = e.target.closest("[data-filter]"); if (!b) return; HC.commit(); S().look.filter = b.dataset.filter; renderTiles(); refresh(); });
     $("fxTiles").addEventListener("click", (e) => {

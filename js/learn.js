@@ -8,7 +8,7 @@
    - 選素材：保留／刪除哪種片段（小模型）、每支素材用幾個鏡頭、影片總長度、運鏡佔比
    - 順序：照拍攝順序的程度、靜止和運鏡怎麼接、用哪一種鏡頭開場
    - 轉場：同一支素材內、換素材、換場景時各用哪種轉場、多長
-   - 畫面：鏡頭長短、短鏡頭比例、縮放幅度、效果（推近／平移）比例、常用的開頭模板、濾鏡、特效
+   - 畫面：鏡頭長短、短鏡頭比例、縮放幅度、推近／平移比例、常用的開頭、片尾、濾鏡
    你自己的修改影響比較大（權重 0.4），參考影片比較小（0.25）。
    學習資料存在這個瀏覽器裡，也可以匯出成檔案備份或帶到別台電腦。
 */
@@ -40,6 +40,7 @@
   try { const j = localStorage.getItem(KEY); if (j) HC.profile = upgrade(JSON.parse(j)); } catch (e) {}
   HC.saveProfile = () => { try { localStorage.setItem(KEY, JSON.stringify(HC.profile)); } catch (e) {} };
   HC.resetProfile = () => { HC.profile = fresh(); HC.saveProfile(); };
+  HC.hasLearned = () => HC.profile.edits > 0 || HC.profile.refs.length > 0;
   HC.importProfile = (o) => { if (!o || !o.style) throw new Error("bad"); HC.profile = upgrade(o); HC.saveProfile(); };
 
   /* ---------- 片段特徵 ---------- */
@@ -86,7 +87,7 @@
     if (shots.length < 3) return null;
     const out = (s) => s.dur / s.speed;
     const stills = shots.filter((s) => s.mode !== "move"), moves = shots.filter((s) => s.mode === "move");
-    const total = shots.reduce((t, s) => t + out(s), 0);
+    const total = HC.timeline().total;   // 扣掉轉場重疊的實際長度
     const longs = stills.map(out).filter((d) => d >= 4), shorts = stills.map(out).filter((d) => d < 4);
     const modes = { in: 0, out: 0, panR: 0, panL: 0, panU: 0, panD: 0 };
     for (const s of stills) if (s.mode in modes) modes[s.mode]++;
@@ -159,10 +160,9 @@
   // 你選的開頭、片尾、濾鏡、特效：記次數，下次開新專案時預先選好最常用的
   function countLook() {
     const L = HC.profile.look, S = HC.state, inc = (m, k) => { m[k] = (m[k] || 0) + 1; };
-    inc(L.opening, S.title.show ? S.title.template : "none");
+    inc(L.opening, S.title.template);
     inc(L.ending, S.ending.template);
     inc(L.filter, S.look.filter);
-    for (const [k, v] of Object.entries(S.look.fx)) if (v) inc(L.fx, k);
   }
   HC.topOf = (m) => Object.entries(m || {}).sort((a, b) => b[1] - a[1])[0];
 
@@ -201,7 +201,7 @@
   HC.analyzeReference = async (file, onProgress) => {
     const url = URL.createObjectURL(file);
     const c = { id: "ref", url };
-    const A = await HC.analyzeClip(c, onProgress, { zoom: true });
+    const A = await HC.analyzeClip(c, onProgress, { zoom: true, ref: true });
     URL.revokeObjectURL(url);
     const n = A.t.length, med = (i) => { const w = A.m.slice(Math.max(0, i - 6), i + 7).sort((x, y) => x - y); return w[w.length >> 1]; };
     // 切點：畫面突然大變；黑場：亮度很低的一段
@@ -219,8 +219,9 @@
     for (let i = k6; i < n - k6; i++) {
       let sum = 0, mx = 0, sx = 0, sy = 0;
       for (let j = i - k6; j < i + k6; j++) { sum += A.m[j]; mx = Math.max(mx, A.m[j]); sx += A.dx[j]; sy += A.dy[j]; }
-      const near = (t) => [...cuts, ...dips, ...fades].some((x) => Math.abs(x - t) < 1.5);
-      if (sum > 40 && mx < sum * 0.35 && Math.hypot(sx, sy) / (2 * k6) < 3 && A.luma[i] >= 10 && !near(A.t[i])) fades.push(A.t[i]);
+      if (!(sum > 40 && mx < sum * 0.35 && Math.hypot(sx, sy) / (2 * k6) < 3 && A.luma[i] >= 10)) continue;
+      const t = A.t[i];
+      if (!cuts.some((x) => Math.abs(x - t) < 1.5) && !dips.some((x) => Math.abs(x - t) < 1.5) && !fades.some((x) => Math.abs(x - t) < 1.5)) fades.push(t);
     }
     const bounds = [0, ...cuts, ...dips, ...fades, c.dur].sort((a, b) => a - b).filter((t, i, a) => i === 0 || t - a[i - 1] > 0.5);
     const shots = [];
@@ -236,7 +237,7 @@
       else if (Math.hypot(dx, dy) > 2 && jit < 6) kind = Math.abs(dx) >= Math.abs(dy) ? (dx < 0 ? "panR" : "panL") : (dy < 0 ? "panD" : "panU");
       else if (m < 1.5) kind = "still";
       const trBefore = dips.some((t) => Math.abs(t - a) < 0.8) ? "black" : fades.some((t) => Math.abs(t - a) < 0.8) ? "fade" : "cut";
-      shots.push({ a, b, d: b - a, kind, zoomAmt: Math.abs(zm) * (b - a), dipBefore: trBefore === "black", trBefore });
+      shots.push({ a, b, d: b - a, kind, zoomAmt: Math.abs(zm) * (b - a), trBefore });
     }
     if (shots.length < 3) throw new Error("找不到足夠的鏡頭切換");
     const fx = shots.filter((s) => s.kind !== "move"), mv = shots.filter((s) => s.kind === "move");

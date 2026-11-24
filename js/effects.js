@@ -216,7 +216,6 @@ function installEffects() {
      g.main / g.sub / g.info 是每個字的目標物件（有 opacity、x、y、scale），
      g.group 是整組，g.line 是標題下的線（scaleX），g.bar 是資訊卡的直線（scaleY），
      g.bars 是電影黑邊（scaleY），g.cursor 是打字機游標。 */
-  const all = (g) => [...g.main, ...g.sub, ...g.info];
   const exit = (tl, g, d, keep) => { if (!keep) tl.to(g.group, { opacity: 0, duration: 0.8, ease: "power1.in" }, Math.max(0.5, d - 0.8)); };
   HC.TITLE_TEMPLATES = [
     { id: "classic", name: "經典置中", layout: "center", line: true, build(tl, g, d, keep) {
@@ -310,6 +309,8 @@ function installEffects() {
       const empty = (t) => Array.isArray(t) && !t.flat().length;
       const w = { from: (t, v, p) => (empty(t) ? w : (tl.from(t, v, p), w)), to: (t, v, p) => (empty(t) ? w : (tl.to(t, v, p), w)), set: (t, v, p) => (empty(t) ? w : (tl.set(t, v, p), w)), fromTo: (t, a, b, p) => (empty(t) ? w : (tl.fromTo(t, a, b, p), w)) };
       tpl.build(w, g, d, keep);
+      // 勾了「標題下加細線」但模板本身沒有線的動畫：線跟著標題一起畫出來，不要一開始就整條出現
+      if (o.line && !tpl.line && !tpl.bar && !tpl.cursor) w.from(g.line, { scaleX: 0, duration: 0.9, ease: "power2.inOut" }, 1.2);
       tl.seek(0);
     }
     const v = { tl, g };
@@ -379,14 +380,14 @@ function installEffects() {
     ctx.restore();
   };
 
-  /* 整個疊加層：特效 → 片頭片尾黑場 → 鏡頭文字 → 開頭 → 片尾
+  /* 整個疊加層：特效 → 濾鏡色調 → 鏡頭文字 → 開頭 → 片尾 → 片頭片尾黑場
      info = { T, total, fi, fo, look, title, ending, captions:[{text,start,dur}] } */
   HC.drawOverlay = (ctx, W, H, info, frame) => {
     const { T, total } = info;
     HC.drawEffects(ctx, W, H, T, info.look && info.look.fx, frame);
     if (info.look && info.look.filter) { const f = HC.filterInfo(info.look.filter); if (f.tint) { ctx.save(); ctx.globalCompositeOperation = "soft-light"; ctx.fillStyle = f.tint.replace(/[\d.]+\)$/, (m) => Math.min(1, parseFloat(m) * 3) + ")"); ctx.fillRect(0, 0, W, H); ctx.restore(); } }
     for (const c of info.captions || []) if (T >= c.start && T < c.start + c.dur) HC.drawCaption(ctx, W, H, c.text, T - c.start, c.dur, info.title.font);
-    if (info.title && info.title.show) HC.drawTitleBlock(ctx, W, H, T, info.title, false);
+    if (info.title) HC.drawTitleBlock(ctx, W, H, T, info.title, false);
     const E = info.ending;
     if (E && E.template !== "none" && E.main) {
       const st = Math.max(0, total - E.dur - (info.fo || 0) * 0.5);

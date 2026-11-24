@@ -2,7 +2,7 @@
    專案資料都放在 HC.state 裡：
    - clips：匯入的素材（檔案本身只存在瀏覽器記憶體，不會上傳）
    - shots：時間軸上的鏡頭，依序播放
-   - title / music / out / auto：各分頁的設定
+   - title / ending / look / music / out / auto：各分頁的設定
 */
 window.HC = window.HC || {};
 {
@@ -11,7 +11,7 @@ window.HC = window.HC || {};
   HC.state = {
     clips: [],
     shots: [],
-    title: { show: true, template: "classic", main: "FFXIV HOUSING", sub: "庭園 ・ Garden", info: "", font: "Noto Serif TC", size: 84, color: "#ffffff", accent: "#e9c46a", pos: "center", line: true, dur: 5.5 },
+    title: { template: "classic", main: "FFXIV HOUSING", sub: "庭園 ・ Garden", info: "", font: "Noto Serif TC", size: 84, color: "#ffffff", accent: "#e9c46a", pos: "center", line: true, dur: 5.5 },
     ending: { template: "none", main: "Thank you for watching", sub: "", info: "", dur: 4 },
     look: { filter: "none", fx: { vignette: 0, glow: 0, bokeh: 0, petals: 0, grain: 0, letterbox: 0 } },
     music: { name: "", url: "", vol: 0.8, off: 0, fade: 3 },

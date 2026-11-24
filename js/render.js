@@ -86,7 +86,6 @@
     HC.drawOverlay(ctx, W, H, R.overlayInfo(T, still), canvas);
     lastDraw = performance.now();
   }
-  R.compose = compose;
 
   /* ---------- 載入某個鏡頭到某個 video ---------- */
   async function load(v, s, off) {
@@ -105,6 +104,7 @@
 
   /* ---------- 跳到某個時間（暫停狀態） ---------- */
   R.seek = async (T) => {
+    if (R.exporting) return;   // 匯出中不能動播放位置
     R.stop();
     const tk = ++token;
     const at = HC.shotAt(T);
@@ -129,10 +129,11 @@
 
   /* ---------- 播放 ---------- */
   R.play = async (T, hooks) => {
-    R.stop();
+    if (R.exporting && !hooks) return false;
+    R.stop(true);
     const tk = ++token;
     const at = HC.shotAt(T);
-    if (!at) return;
+    if (!at) return false;
     const S = HC.state, { starts } = HC.timeline();
     try {
       if (at.overlap) {
@@ -143,8 +144,8 @@
         await load(vids[cur], S.shots[at.i], at.off);
         idx = at.i; nextOn = false;
       }
-    } catch (e) { R.onError && R.onError(e); return; }
-    if (tk !== token) return;
+    } catch (e) { R.onError && R.onError(e); return false; }
+    if (tk !== token) return false;
     waitHooks = hooks || null;
     if (nextOn) compose(T, vids[cur], idx, T - starts[idx], vids[1 - cur], idx + 1, at.off); else compose(T, vids[cur], idx, at.off);
     hooks && hooks.ready && (await hooks.ready());
@@ -155,8 +156,11 @@
     if (nextOn) await vids[1 - cur].play().catch(() => {});
     R.onState && R.onState(true);
     requestAnimationFrame(() => loop(tk));
+    return true;
   };
-  R.stop = () => {
+  /* force：匯出中只有匯出流程自己能停 */
+  R.stop = (force) => {
+    if (R.exporting && !force) return;
     playing = false; advancing = false; nextOn = false;
     vids.forEach((v) => v.pause());
     R.music.stop();
@@ -191,7 +195,7 @@
       const S = HC.state, { starts } = HC.timeline(), ni = idx + 1;
       // 轉場開始：讓下一個鏡頭也開始播
       if (!nextOn && S.shots[ni] && HC.trDur(ni) > 0 && st.T >= starts[ni]) startNext(tk);
-      if (st.lt >= st.od - 0.017 || st.v.ended) advance(tk);
+      else if (st.lt >= st.od - 0.017 || st.v.ended) advance(tk);
       else {
         if (!st.v._rvfc || performance.now() - lastDraw > 50) draw();
         R.T = st.T; R.music.sync(st.T); R.onTime && R.onTime(st.T);
@@ -204,7 +208,7 @@
     let ok = nextReady ? await withWait(nextReady) : false;
     if (tk !== token) return;
     if (!ok) ok = await withWait(load(vids[1 - cur], HC.state.shots[idx + 1], 0).then(() => true).catch(() => false));
-    if (!ok || tk !== token) { R.stop(); return; }
+    if (!ok || tk !== token) { R.stop(true); finishHooks(); return; }
     nextOn = true;
     const nv = vids[1 - cur];
     nv.playbackRate = HC.state.shots[idx + 1].speed;
@@ -226,7 +230,7 @@
     if (tk !== token) return;
     if (!ok) {
       ok = await withWait(load(vids[1 - cur], S.shots[idx + 1], 0).then(() => true).catch(() => false));
-      if (!ok || tk !== token) { R.stop(); return; }
+      if (!ok || tk !== token) { R.stop(true); finishHooks(); return; }
     }
     cur = 1 - cur; idx++;
     const v = vids[cur];
@@ -251,12 +255,13 @@
   }
   function finish() {
     const { total } = HC.timeline();
-    R.stop();
+    R.stop(true);
     R.T = total;
     R.onTime && R.onTime(total);
-    const h = waitHooks; waitHooks = null;
-    h && h.done && h.done();
+    finishHooks();
   }
+  // 播放結束（或素材載入失敗中斷）時通知匯出流程，避免一直等下去
+  function finishHooks() { const h = waitHooks; waitHooks = null; h && h.done && h.done(); }
 
   /* ---------- 背景音樂 ---------- */
   const au = new Audio();
@@ -311,6 +316,8 @@
     const S = HC.state;
     if (!window.MediaRecorder) return reject(new Error("這個瀏覽器不支援錄製，請改用 Chrome 或 Edge"));
     const mime = R.pickMime();
+    R.stop();
+    R.exporting = true;
     const H0 = canvas.height;
     const h = S.out.res === 720 ? 720 : 1080;
     canvas.width = h * 16 / 9; canvas.height = h;
@@ -319,20 +326,21 @@
     const rec = new MediaRecorder(stream, { mimeType: mime || undefined, videoBitsPerSecond: S.out.rate * 1e6, audioBitsPerSecond: 192000 });
     const chunks = [];
     rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+    const restore = () => { R.exporting = false; canvas.width = H0 * 16 / 9; canvas.height = H0; R.onTime = prevOnTime; };
     rec.onstop = () => {
-      canvas.width = H0 * 16 / 9; canvas.height = H0;
-      R.onTime = prevOnTime;
+      restore();
       resolve({ blob: new Blob(chunks, { type: (mime || "video/webm").split(";")[0] }), ext: (mime || "webm").includes("mp4") ? "mp4" : "webm" });
     };
     const prevOnTime = R.onTime;
     const { total } = HC.timeline();
     R.onTime = (T) => { prevOnTime && prevOnTime(T); onProgress && onProgress(T / total); };
-    R.cancelExport = () => { R.stop(); if (rec.state !== "inactive") rec.stop(); };
-    await R.play(0, {
+    R.cancelExport = () => { R.stop(true); if (rec.state !== "inactive") rec.stop(); };
+    const ok = await R.play(0, {
       ready: async () => { rec.start(1000); },
       pause: () => { if (rec.state === "recording") rec.pause(); },
       resume: () => { if (rec.state === "paused") rec.resume(); },
       done: () => { setTimeout(() => rec.state !== "inactive" && rec.stop(), 250); },
     });
+    if (!ok) { if (rec.state !== "inactive") { rec.onstop = null; rec.stop(); } restore(); reject(new Error("有鏡頭的素材無法載入")); }
   });
 }

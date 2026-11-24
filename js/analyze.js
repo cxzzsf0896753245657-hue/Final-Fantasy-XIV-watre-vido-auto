@@ -42,14 +42,14 @@
         diff /= g.length / 2;
         const sh = shift(prev, g);
         A.t.push(t); A.m.push(diff * 0.1 / dt); A.dx.push(sh[0] / dt); A.dy.push(sh[1] / dt); A.luma.push(sum / g.length);
-        A.blk.push(diff > 3 ? staticBlocks(prev, g, diff) : null);   // 介面會讓位移估計變成 0，所以只看整體變化量
+        A.blk.push(!opts.ref && diff > 3 ? staticBlocks(prev, g, diff) : null);   // 介面會讓位移估計變成 0，所以只看整體變化量
         if (opts.zoom) {   // 參考影片：左右兩半各估一次位移，差值 = 推近／拉遠
           const L = shift(prev, g, 20, SW / 2 - 8), Rr = shift(prev, g, SW / 2 + 8, SW - 20);
           A.zm.push(((Rr[0] - L[0]) / (SW / 2)) / dt);
         }
       }
       prev = g; prevT = t;
-      if (t - lastCur >= 0.3) {
+      if (!opts.ref && t - lastCur >= 0.3) {   // 參考影片不需要找游標
         lastCur = t;
         cx.drawImage(v, 0, 0, CW, CH);
         if (HC.findCursor(cx.getImageData(0, 0, CW, CH))) A.curT.push(t);
@@ -63,7 +63,7 @@
 
     A.cursor = ranges(A.curT, 0.6, 0.45);
     HC.findUI(A);
-    if (!HC.debugUI) delete A.blk;
+    delete A.blk; delete A.curT;   // 只是中間資料，不必留著佔記憶體
     clip.ana = A;
     v.removeAttribute("src"); v.load();
     return A;
@@ -139,7 +139,7 @@
   HC.findUI = (A) => {
     const n = A.t.length, U = HC.UI;
     const moving = A.blk.map((b, i) => (b ? i : -1)).filter((i) => i >= 0);
-    A.uiFlag = new Array(n).fill(false);
+    const flag = new Array(n).fill(false);
     A.ui = [];
     if (moving.length < 4) return;
     // 每個格子在移動畫面裡「不動」的比例
@@ -151,19 +151,19 @@
     for (const i of moving) {
       const b = A.blk[i]; let c = 0;
       for (let k = 0; k < b.length; k++) if (b[k] && persistent[k]) c++;
-      A.uiFlag[i] = c >= U.minBlocks;
+      flag[i] = c >= U.minBlocks;
     }
     // 靜止的取樣看不出來，沿用前後 4 秒內最近的移動取樣
     for (let i = 0; i < n; i++) {
       if (A.blk[i]) continue;
       let best = null, bd = 4;
       for (const j of moving) { const d = Math.abs(A.t[j] - A.t[i]); if (d < bd) { bd = d; best = j; } }
-      if (best != null) A.uiFlag[i] = A.uiFlag[best];
+      if (best != null) flag[i] = flag[best];
     }
-    // 連成區間（少於 3 個取樣的視為雜訊）
+    // 連成區間（只有 1 個取樣的視為雜訊）
     let s0 = -1;
     for (let i = 0; i <= n; i++) {
-      const on = i < n && A.uiFlag[i];
+      const on = i < n && flag[i];
       if (on && s0 < 0) s0 = i;
       if (!on && s0 >= 0) { if (i - s0 >= 2) A.ui.push([Math.max(0, A.t[s0] - 0.3), A.t[i - 1] + 0.3]); s0 = -1; }
     }
@@ -171,7 +171,6 @@
     const merged = [];
     for (const r of A.ui) { if (merged.length && r[0] - merged[merged.length - 1][1] < 2.5) merged[merged.length - 1][1] = r[1]; else merged.push(r); }
     A.ui = merged;
-    A.uiBlocks = Array.from(persistent);
   };
 
   /* 時間點合併成區間 */
@@ -185,15 +184,19 @@
   }
 
   /* 找白色箭頭游標：白色小塊、外圈是深色描邊、尖端在左上、形狀細長 */
+  let bufWhite = null, bufSeen = null;   // 每 0.3 秒找一次，重複使用同一塊記憶體
   HC.findCursor = (img) => {
     const { data, width: W, height: H } = img;
-    const white = new Uint8Array(W * H);
+    if (!bufWhite || bufWhite.length !== W * H) { bufWhite = new Uint8Array(W * H); bufSeen = new Uint8Array(W * H); }
+    const white = bufWhite;
+    white.fill(0);
     let count = 0;
     for (let i = 0, j = 0; i < white.length; i++, j += 4) {
       if (data[j] > 222 && data[j + 1] > 222 && data[j + 2] > 222) { white[i] = 1; count++; }
     }
     if (!count || count > W * H * 0.2) return false;
-    const seen = new Uint8Array(W * H);
+    const seen = bufSeen;
+    seen.fill(0);
     const stack = [];
     for (let p = 0; p < white.length; p++) {
       if (!white[p] || seen[p]) continue;

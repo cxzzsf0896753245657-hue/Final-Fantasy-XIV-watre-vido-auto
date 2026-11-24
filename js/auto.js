@@ -2,7 +2,7 @@
    1. 把每支素材分成「靜止」「運鏡」「太快／晃動／有鼠標」三種時段
    2. 靜止時段 → 加推近、拉遠或平移效果；運鏡時段 → 保留原本的鏡頭移動
    3. 先讓每支素材至少有一個鏡頭（涵蓋所有場景），再依分數補到目標長度
-   4. 依拍攝順序排好，長鏡頭之間穿插短鏡頭做出節奏
+   4. 長鏡頭之間穿插短鏡頭做出節奏，再決定順序（照拍攝時間或依學到的接法）和轉場
 */
 {
   const HC = window.HC;
@@ -106,7 +106,8 @@
   HC.autoEdit = () => {
     const S = HC.state, opt = S.auto, T = HC.TUNE;
     // 套用學到的風格：把學到的數值填進設定（介面上的滑桿也會跟著變）
-    const L = opt.learn && HC.profile ? HC.profile.style : null;
+    // 還沒學過任何東西時不覆蓋你調的滑桿（預設風格和滑桿預設值一樣，套了沒意義）
+    const L = opt.learn && HC.hasLearned && HC.hasLearned() ? HC.profile.style : null;
     if (!L) Object.assign(T, HC.TUNE_DEFAULT);
     if (L) {
       T.longStill = +HC.clamp(L.longStill, 3, 12).toFixed(1); T.shortStill = +HC.clamp(L.shortStill, 1.5, 4).toFixed(1); T.maxMove = Math.round(HC.clamp(L.maxMove, 4, 20));

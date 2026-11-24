@@ -9,10 +9,9 @@
   const cache = new Map();          // key -> {t, x, y}（原始素材時間、以畫面寬高為單位的累積位移）
   const jobs = [];
   let running = false;
-  const FW = 640, FH = 360;
-  HC.STAB_RATE = 0.5;   // 量測時的播放速度：太快會漏格      // 量測用的畫面大小（越大越準、越慢）
+  const FW = 640, FH = 360;       // 量測用的畫面大小（越大越準、越慢）
+  HC.STAB_RATE = 0.5;             // 量測時的播放速度：太快會漏格
 
-  HC.stabMeasure = (clip, a, b) => measure(clip, a, b);
   HC.stabKey = (s) => `${s.clipId}|${s.start.toFixed(2)}|${s.dur.toFixed(2)}`;
   HC.stabReady = (s) => cache.has(HC.stabKey(s));
   HC.stabPending = () => jobs.length + (running ? 1 : 0);
@@ -97,36 +96,6 @@
     v.removeAttribute("src"); v.load();
     return { t: Float64Array.from(T), x: Float64Array.from(X), y: Float64Array.from(Y) };
   }
-
-  /* 兩張灰階圖的位移：先在半解析度粗找，再在原解析度細找，最後用拋物線取到小數點 */
-  HC.estimateShift = (a, b, W, H) => {
-    const sad = (ox, oy, step, x0, x1, y0, y1) => {
-      let s = 0, n = 0;
-      for (let y = y0; y < y1; y += step) {
-        const ra = y * W, rb = (y + oy) * W + ox;
-        for (let x = x0; x < x1; x += step) { s += Math.abs(a[ra + x] - b[rb + x]); n++; }
-      }
-      return s / n;
-    };
-    const mx = 26, my = 18;
-    let best = Infinity, bx = 0, by = 0;
-    for (let oy = -16; oy <= 16; oy += 2) for (let ox = -24; ox <= 24; ox += 2) {
-      const s = sad(ox, oy, 4, mx, W - mx, my, H - my);
-      if (s < best) { best = s; bx = ox; by = oy; }
-    }
-    const fine = {};
-    let fb = Infinity, fx = bx, fy = by;
-    for (let oy = by - 2; oy <= by + 2; oy++) for (let ox = bx - 2; ox <= bx + 2; ox++) {
-      if (Math.abs(ox) > mx - 1 || Math.abs(oy) > my - 1) continue;
-      const s = sad(ox, oy, 2, mx, W - mx, my, H - my);
-      fine[ox + "," + oy] = s;
-      if (s < fb) { fb = s; fx = ox; fy = oy; }
-    }
-    const sub = (m, c, p) => (m == null || p == null || !isFinite(m) || !isFinite(p)) ? 0 : HC.clamp((m - p) / (2 * (m - 2 * c + p) || 1), -0.5, 0.5);
-    const sx = sub(fine[(fx - 1) + "," + fy], fb, fine[(fx + 1) + "," + fy]);
-    const sy = sub(fine[fx + "," + (fy - 1)], fb, fine[fx + "," + (fy + 1)]);
-    return [fx + sx, fy + sy];
-  };
 
   /* 量位移（兩段式）：
      1. 相位相關法：把畫面縮成 256×128 做 FFT，找出整體位移的大方向（對前後景移動速度不同的畫面比較穩）
@@ -213,14 +182,12 @@
     const sub = (m, c, p) => (m == null || p == null) ? 0 : HC.clamp((m - p) / (2 * (m - 2 * c + p) || 1), -0.5, 0.5);
     return [bx + sub(res[(bx - 1) + "," + by], best, res[(bx + 1) + "," + by]), by + sub(res[bx + "," + (by - 1)], best, res[bx + "," + (by + 1)])];
   }
-  HC._phaseTest = (a, b) => phaseShift(spectrum(a), spectrum(b));
-  HC._refineTest = (a, b, x, y) => refine(a, b, x, y);
   let prevSpec = null;
   function shiftPyramid(a, b) {
     const sb = spectrum(b), sa = prevSpec && prevSpec.g === a ? prevSpec.s : spectrum(a);
     prevSpec = { g: b, s: sb };
     const [px, py] = phaseShift(sa, sb);
-    return HC.stabNoRefine ? [px, py] : refine(a, b, px, py);
+    return refine(a, b, px, py);
   }
 
   /* 取得某個原始時間點要補償的位移（以畫面寬高為單位） */
