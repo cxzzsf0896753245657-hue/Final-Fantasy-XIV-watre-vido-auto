@@ -113,7 +113,9 @@
     return {
       // 暫停時不套片頭片尾的淡入淡出，才看得到畫面
       T, total, fi: still ? 0 : S.out.fi, fo: still ? 0 : S.out.fo, look: S.look, title: S.title, ending: S.ending, wm: S.wm,
-      captions: S.shots.map((s, i) => s.text ? { text: s.text, start: starts[i], dur: HC.outDur(s) } : null).filter(Boolean),
+      captions: [...S.shots.map((s, i) => s.text ? { text: s.text, start: starts[i], dur: HC.outDur(s) } : null).filter(Boolean),
+        ...(S.texts || []).map((t) => { const [a, b] = HC.textSpan(t, null, total); return { text: t.text, sub: t.sub, style: t.style, pos: t.pos, start: a, dur: b - a }; })],
+      fxItems: S.fxItems || [],
     };
   };
 
@@ -353,7 +355,7 @@
     if (L.au.src !== a.url) L.au.src = a.url;
     return L;
   }
-  const ambTime = (L, T) => (L.au.duration > 0 ? T % L.au.duration : T);
+  const ambTime = (L, T, a) => { const t = Math.max(0, T - ((a && a.start) || 0)); return L.au.duration > 0 ? t % L.au.duration : t; };
   function dropLayers() {
     const keep = new Set(HC.state.amb.map((a) => a.key));
     for (const [k, L] of layers) if (!keep.has(k)) { L.au.pause(); L.au.removeAttribute("src"); L.gain.disconnect(); layers.delete(k); }
@@ -370,15 +372,24 @@
     },
     stream() { this.ensure(); return dest.stream; },
     has: () => !!HC.state.music.url || HC.state.amb.length > 0,
+    /* 音樂軌：只在 [at, 結束] 之間有聲音；開頭 0.5 秒淡入、結尾淡出 */
+    musicSpan() {
+      const M = HC.state.music, { total } = HC.timeline(), a = M.at || 0;
+      const dur = this.el.duration > 0 ? this.el.duration - (M.off || 0) : 1e9;
+      return [a, Math.min(total, a + (M.len > 0 ? M.len : 1e9), a + dur)];
+    },
     level(T) {
-      const M = HC.state.music, { total } = HC.timeline();
-      let g = M.vol * fadeOut(T, total, M.fade);
-      if (T < 0.5) g *= T / 0.5;
+      const M = HC.state.music, [a, b] = this.musicSpan();
+      if (T < a || T >= b) return 0;
+      let g = M.vol * fadeOut(T, b, M.fade);
+      if (T - a < 0.5 && a > 0.01) g *= (T - a) / 0.5; else if (T < 0.5) g *= T / 0.5;
       return g;
     },
+    musicTime: (T) => (HC.state.music.off || 0) + (T - (HC.state.music.at || 0)),
     ambLevel(a, T) {
-      const { total } = HC.timeline();
-      return a.vol * fadeOut(T, total, Math.max(1.5, HC.state.music.fade)) * HC.clamp(T / 1.5, 0, 1);
+      const [s, e] = HC.spanOf(a);
+      if (T < s || T >= e) return 0;
+      return a.vol * fadeOut(T, e, Math.max(1.5, HC.state.music.fade)) * HC.clamp((T - s) / 1.5, 0, 1);
     },
     start(T) {
       const M = HC.state.music;
@@ -388,13 +399,13 @@
       dropLayers();
       if (M.url) {
         if (au.src !== M.url) au.src = M.url;
-        au.currentTime = M.off + T;
+        au.currentTime = Math.max(0, this.musicTime(T));
         gain.gain.value = this.level(T);
-        au.play().catch(() => {});
+        if (T >= (M.at || 0)) au.play().catch(() => {}); else au.pause();
       }
       for (const a of HC.state.amb) {
         const L = layer(a);
-        L.au.currentTime = ambTime(L, T); L.gain.gain.value = this.ambLevel(a, T);
+        L.au.currentTime = ambTime(L, T, a); L.gain.gain.value = this.ambLevel(a, T);
         L.au.play().catch(() => {});
       }
     },
@@ -403,12 +414,14 @@
       if (!actx || held) return;
       if (M.url) {
         gain.gain.value = this.level(T);
-        if (Math.abs(au.currentTime - (M.off + T)) > 0.2) au.currentTime = M.off + T;
+        const want = this.musicTime(T);
+        if (want < 0) { if (!au.paused) au.pause(); }
+        else { if (au.paused) au.play().catch(() => {}); if (Math.abs(au.currentTime - want) > 0.2) au.currentTime = want; }
       }
       for (const a of HC.state.amb) {
         const L = layers.get(a.key); if (!L) continue;
         L.gain.gain.value = this.ambLevel(a, T);
-        const want = ambTime(L, T);
+        const want = ambTime(L, T, a);
         if (Math.abs(L.au.currentTime - want) > 0.35 && Math.abs(L.au.currentTime - want) < (L.au.duration || 1e9) - 0.35) L.au.currentTime = want;
       }
     },

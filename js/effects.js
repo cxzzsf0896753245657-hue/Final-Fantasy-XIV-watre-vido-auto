@@ -394,15 +394,28 @@ function installEffects() {
   };
 
   /* 鏡頭上的文字（例如「夜」「臥室」） */
-  HC.drawCaption = (ctx, W, H, text, lt, od, font) => {
-    const a = lt < 0.6 ? 0 : lt < 1.3 ? (lt - 0.6) / 0.7 : lt < od - 0.4 - 0.7 ? 1 : lt < od - 0.4 ? (od - 0.4 - lt) / 0.7 : 0;
-    if (a <= 0) return;
-    const u = Math.min(W, H) / 1080;
+  /* o.style：caption（置中大字）、lower（下方字幕條）、big（大標）；o.pos：center／top／bottom */
+  HC.drawCaption = (ctx, W, H, text, lt, od, font, o = {}) => {
+    const fin = Math.min(0.5, od / 4), a = clamp(Math.min(lt / fin, (od - lt) / fin), 0, 1);
+    if (a <= 0 || !text) return;
+    const u = Math.min(W, H) / 1080, style = o.style || "caption";
+    const y = o.pos === "top" ? H * 0.16 : o.pos === "bottom" ? H * 0.84 : H * 0.47;
     ctx.save();
-    ctx.globalAlpha = a * 0.92; ctx.textAlign = "center";
-    ctx.shadowColor = "rgba(0,0,0,.6)"; ctx.shadowBlur = 8 * u; ctx.shadowOffsetX = 2 * u; ctx.shadowOffsetY = 2 * u;
-    ctx.fillStyle = "#fff"; ctx.font = `500 ${88 * u}px "${font}", serif`;
-    ctx.fillText(text, W / 2, H * 0.47);
+    ctx.globalAlpha = a * 0.95; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    if (style === "lower") {
+      const fs = 46 * u; ctx.font = `500 ${fs}px "Noto Sans TC", sans-serif`;
+      const w = Math.max(ctx.measureText(text).width, o.sub ? (ctx.font = `400 ${fs * 0.6}px "Noto Sans TC", sans-serif`, ctx.measureText(o.sub).width) : 0) + 60 * u;
+      const h = (o.sub ? fs * 1.9 : fs * 1.3) + 16 * u, yy = (o.pos ? y : H * 0.84) - h / 2;
+      ctx.fillStyle = "rgba(10,10,14,.6)"; ctx.fillRect(W / 2 - w / 2, yy, w, h);
+      ctx.fillStyle = "#fff"; ctx.font = `500 ${fs}px "Noto Sans TC", sans-serif`; ctx.fillText(text, W / 2, yy + (o.sub ? fs * 0.75 : h / 2) + 4 * u);
+      if (o.sub) { ctx.fillStyle = "rgba(255,255,255,.8)"; ctx.font = `400 ${fs * 0.6}px "Noto Sans TC", sans-serif`; ctx.fillText(o.sub, W / 2, yy + fs * 1.55 + 4 * u); }
+    } else {
+      const fs = (style === "big" ? 130 : 88) * u;
+      ctx.shadowColor = "rgba(0,0,0,.6)"; ctx.shadowBlur = 8 * u; ctx.shadowOffsetX = 2 * u; ctx.shadowOffsetY = 2 * u;
+      ctx.fillStyle = "#fff"; ctx.font = `${style === "big" ? 700 : 500} ${fs}px "${font}", serif`;
+      ctx.fillText(text, W / 2, y);
+      if (o.sub) { ctx.font = `400 ${fs * 0.36}px "Noto Sans TC", sans-serif`; ctx.fillStyle = "rgba(255,255,255,.85)"; ctx.fillText(o.sub, W / 2, y + fs * 0.75); }
+    }
     ctx.restore();
   };
 
@@ -499,13 +512,25 @@ function installEffects() {
     ctx.restore();
   };
 
+  /* 特效軌：某個時間點有哪些特效、多強（頭尾 0.6 秒漸強／漸弱） */
+  HC.fxAt = (items, T, total) => {
+    const out = {};
+    for (const it of items || []) {
+      const a = it.start || 0, b = it.dur > 0 ? Math.min(total, a + it.dur) : total;
+      if (T < a || T >= b) continue;
+      const k = Math.min(1, (T - a) / 0.6 + (a === 0 ? 1 : 0), (b - T) / 0.6 + (b >= total - 0.01 ? 1 : 0));
+      out[it.fx] = Math.max(out[it.fx] || 0, (it.str ?? 0.6) * clamp(k, 0, 1));
+    }
+    return out;
+  };
+
   /* 整個疊加層：特效 → 濾鏡色調 → 鏡頭文字 → 開頭 → 片尾 → 片頭片尾黑場
      info = { T, total, fi, fo, look, title, ending, captions:[{text,start,dur}] } */
   HC.drawOverlay = (ctx, W, H, info, frame) => {
     const { T, total } = info;
-    HC.drawEffects(ctx, W, H, T, info.look && info.look.fx, frame);
+    HC.drawEffects(ctx, W, H, T, info.fxItems ? HC.fxAt(info.fxItems, T, total) : info.look && info.look.fx, frame);
     if (info.look && info.look.filter) { const t = HC.tintFill(info.look.filter, info.look.tintStr ?? 1); if (t) { ctx.save(); ctx.globalCompositeOperation = "soft-light"; ctx.fillStyle = t; ctx.fillRect(0, 0, W, H); ctx.restore(); } }
-    for (const c of info.captions || []) if (T >= c.start && T < c.start + c.dur) HC.drawCaption(ctx, W, H, c.text, T - c.start, c.dur, info.title.font);
+    for (const c of info.captions || []) if (T >= c.start && T < c.start + c.dur) HC.drawCaption(ctx, W, H, c.text, T - c.start, c.dur, info.title.font, c);
     // HyperFrames 用：標註的位置事先算好（每 0.1 秒一點）
     for (const lb of info.labels || []) {
       if (T < lb.start || T >= lb.start + lb.dur || !lb.pts.length) continue;
@@ -514,7 +539,7 @@ function installEffects() {
     }
     for (const sp of info.splits || []) if (T >= sp.start && T < sp.start + sp.dur) HC.drawSplitUI(ctx, W, H, HC.splitPos(T - sp.start, sp.dur), sp.labels, T - sp.start, sp.dur);
     HC.drawWatermark(ctx, W, H, info.wm);
-    if (info.title) HC.drawTitleBlock(ctx, W, H, T, info.title, false);
+    if (info.title && T >= (info.title.at || 0)) HC.drawTitleBlock(ctx, W, H, T - (info.title.at || 0), info.title, false);
     const E = info.ending;
     if (E && E.template !== "none" && E.main) {
       const st = Math.max(0, total - E.dur - (info.fo || 0) * 0.5);

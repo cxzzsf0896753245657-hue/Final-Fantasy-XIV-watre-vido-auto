@@ -194,7 +194,94 @@
 
   /* ---------- 鏡頭設定 ---------- */
   /* how：省略 = 只選這個；"toggle" = Ctrl 點（加入／移出）；"range" = Shift 點（選一整段）；"keep" = 只重新整理表單 */
+  const linkedText = (s) => (S().texts || []).find((t) => t.shotId === s.id);
+  /* ---------- 文字、特效、音樂項目的編輯表單 ---------- */
+  function selectItem(kind, id) {
+    selItem = { kind, id };
+    selSet.clear(); sel = null;
+    document.querySelectorAll(".shot.on").forEach((el) => el.classList.remove("on"));
+    $("shotEmpty").classList.add("hidden"); $("shotForm").classList.add("hidden");
+    document.querySelector('[data-tab="shot"]').click();
+    renderItemForm(); renderLanes();
+  }
+  function clearItem() { selItem = null; $("itemForm").classList.add("hidden"); }
+  function renderItemForm() {
+    const f = $("itemForm"), S_ = S(); if (!selItem) return clearItem();
+    const { kind, id } = selItem, { total } = HC.timeline();
+    const num = (k, v, lab, step = 0.1, min = 0) => `<label>${lab}<input type="number" data-k="${k}" value="${+(+v).toFixed(2)}" step="${step}" min="${min}"></label>`;
+    let h = "";
+    if (kind === "text") {
+      const t = S_.texts.find((x) => x.id === id); if (!t) return clearItem();
+      const [a, b] = textSpan(t, HC.timeline().starts, total);
+      h = `<h3 class="sec">文字</h3>
+        <label>文字<input type="text" data-k="text" value="${esc(t.text)}" placeholder="例如：二樓臥室"></label>
+        <label>小字（選填）<input type="text" data-k="sub" value="${esc(t.sub || "")}"></label>
+        <div class="row2"><label>樣式<select data-k="style">${[["caption", "置中大字"], ["lower", "下方字幕條"], ["big", "大標題"]].map(([v, n]) => `<option value="${v}" ${t.style === v ? "selected" : ""}>${n}</option>`).join("")}</select></label>
+        <label>位置<select data-k="pos">${[["center", "中間"], ["top", "上方"], ["bottom", "下方"]].map(([v, n]) => `<option value="${v}" ${t.pos === v ? "selected" : ""}>${n}</option>`).join("")}</select></label></div>
+        <div class="row2">${num("start", a, "開始（秒）")}${num("dur", b - a, "長度（秒）", 0.1, 0.5)}</div>
+        ${t.shotId ? `<p class="hint">🔗 跟著一個鏡頭（鏡頭移動時一起移動）。在時間軸上拖曳就會變成獨立的文字。</p>` : ""}`;
+    } else if (kind === "fx") {
+      const x = S_.fxItems.find((y) => y.id === id); if (!x) return clearItem();
+      const [a, b] = HC.spanOf(x, total);
+      h = `<h3 class="sec">特效</h3>
+        <label>特效<select data-k="fx">${HC.EFFECTS.map((e) => `<option value="${e.id}" ${x.fx === e.id ? "selected" : ""}>${esc(e.name)}</option>`).join("")}</select></label>
+        <label>強度 <output>${Math.round((x.str ?? 0.6) * 100)}%</output><input type="range" data-k="str" min="10" max="100" step="5" value="${Math.round((x.str ?? 0.6) * 100)}"></label>
+        <div class="row2">${num("start", a, "開始（秒）")}${num("dur", b - a, "長度（秒）", 0.1, 0.5)}</div>
+        <label class="check"><input type="checkbox" data-k="toEnd" ${x.dur > 0 ? "" : "checked"}> 一直到影片結束</label>`;
+    } else if (kind === "music") {
+      const M = S_.music, [a, b] = R.music.musicSpan();
+      h = `<h3 class="sec">背景音樂</h3><p class="clipname">${esc(M.name)}</p>
+        <div class="row2">${num("at", a, "從影片第幾秒開始")}${num("off", M.off || 0, "從音樂第幾秒播")}</div>
+        <div class="row2">${num("len", b - a, "播多久（秒）", 0.5, 1)}<label>音量 <output>${Math.round(M.vol * 100)}%</output><input type="range" data-k="vol" min="0" max="100" value="${Math.round(M.vol * 100)}"></label></div>
+        <p class="hint">在時間軸上拖曳音樂可以移動；拖左右邊緣可以剪掉音樂的開頭或結尾。</p>`;
+    } else if (kind === "amb") {
+      const x = S_.amb.find((y) => y.key === id); if (!x) return clearItem();
+      const [a, b] = HC.spanOf(x, total);
+      h = `<h3 class="sec">環境音</h3><p class="clipname">${esc(x.name)}</p>
+        <label>音量 <output>${Math.round(x.vol * 100)}%</output><input type="range" data-k="vol" min="0" max="100" value="${Math.round(x.vol * 100)}"></label>
+        <div class="row2">${num("start", a, "開始（秒）")}${num("dur", b - a, "長度（秒）", 0.5, 1)}</div>
+        <label class="check"><input type="checkbox" data-k="toEnd" ${x.dur > 0 ? "" : "checked"}> 一直到影片結束</label>`;
+    } else if (kind === "title" || kind === "ending") {
+      const o = kind === "title" ? S_.title : S_.ending;
+      h = `<h3 class="sec">${kind === "title" ? "開頭標題" : "片尾"}</h3><p class="clipname">${esc(o.main)}</p>
+        ${kind === "title" ? `<div class="row2">${num("at", o.at || 0, "從第幾秒出現")}${num("dur", o.dur, "顯示秒數", 0.5, 2)}</div>` : num("dur", o.dur, "顯示秒數", 0.5, 2)}
+        <button class="btn" data-act="goTitle">到「開頭片尾」分頁改文字和樣式</button>`;
+    }
+    h += kind !== "title" && kind !== "ending" ? `<div class="btnrow"><button class="btn" data-act="del">刪除${kind === "music" ? "音樂" : ""}</button><button class="btn" data-act="close">完成</button></div>` : `<button class="btn" data-act="close">完成</button>`;
+    f.innerHTML = h; f.classList.remove("hidden");
+  }
+  function itemInput(e) {
+    const el = e.target.closest("[data-k]"); if (!el || !selItem) return;
+    const k = el.dataset.k, v = el.type === "checkbox" ? el.checked : el.type === "range" ? +el.value / 100 : el.type === "number" ? +el.value : el.value;
+    const S_ = S(), { kind, id } = selItem, { total } = HC.timeline();
+    if (!editing) { HC.commit(); editing = true; }
+    const out = el.parentElement.querySelector("output"); if (out && el.type === "range") out.textContent = Math.round(v * 100) + "%";
+    if (kind === "text" || kind === "fx" || kind === "amb") {
+      const x = kind === "text" ? S_.texts.find((t) => t.id === id) : kind === "fx" ? S_.fxItems.find((t) => t.id === id) : S_.amb.find((t) => t.key === id);
+      if (!x) return;
+      if ((k === "start" || k === "dur") && x.shotId) { const [a, b] = textSpan(x, HC.timeline().starts, total); x.start = a; x.dur = b - a; delete x.shotId; }
+      if (k === "start") x.start = Math.max(0, v);
+      else if (k === "dur") x.dur = Math.max(0.5, v);
+      else if (k === "toEnd") x.dur = v ? 0 : +(total - (x.start || 0)).toFixed(2);
+      else x[k] = v;
+    } else if (kind === "music") { const M = S_.music; if (k === "len") M.len = Math.max(1, v); else M[k] = k === "vol" ? v : Math.max(0, v); }
+    else if (kind === "title") S_.title[k] = Math.max(k === "dur" ? 2 : 0, v);
+    else if (kind === "ending") S_.ending.dur = Math.max(2, v);
+    renderLanes(); refresh();
+    if (kind === "music" && k === "vol") $("mVol") && ($("mVol").value = Math.round(v * 100));
+  }
+  function deleteItem() {
+    if (!selItem) return;
+    const S_ = S(), { kind, id } = selItem;
+    HC.commit();
+    if (kind === "text") S_.texts = S_.texts.filter((t) => t.id !== id);
+    else if (kind === "fx") S_.fxItems = S_.fxItems.filter((t) => t.id !== id);
+    else if (kind === "amb") HC.removeAmb(id);
+    else if (kind === "music") $("mClear").click();
+    clearItem(); $("shotEmpty").classList.remove("hidden"); renderTimeline(); renderFx(); refresh();
+  }
   function select(id, how) {
+    if (id) clearItem();
     if (how === "toggle" && id) { if (selSet.has(id)) selSet.delete(id); else selSet.add(id); id = selSet.has(id) ? id : [...selSet].pop() || null; }
     else if (how === "range" && id && sel && idxOf(sel) >= 0) {
       const a = idxOf(sel), b = idxOf(id); selSet.clear();
@@ -235,7 +322,7 @@
     if (document.activeElement !== $("sPip")) $("sPip").innerHTML = opts(s.pip);
     $("sPipOpt").classList.toggle("hidden", !s.pip);
     if (s.pip) { setv("sPipCorner", s.pip.corner || "br"); setv("sPipSize", Math.round((s.pip.size || 0.3) * 100)); $("sPipSizeV").textContent = Math.round((s.pip.size || 0.3) * 100) + "%"; }
-    setv("sSpeed", String(s.speed)); setv("sText", s.text || "");
+    setv("sSpeed", String(s.speed)); setv("sText", (linkedText(s) || {}).text || s.text || "");
     const i = S().shots.indexOf(s);
     $("sTr").disabled = $("sTrDur").disabled = i === 0;
     setv("sTr", (s.tr && s.tr.type) || "cut"); setv("sTrDur", (s.tr && s.tr.dur) || HC.trInfo((s.tr && s.tr.type) || "cut").dur);
@@ -306,7 +393,7 @@
       const w = Math.max(6, x1 - x0 - 2), c = HC.clip(s.clipId);
       const lab = `${MODE[s.mode]}${s.text ? "・" + s.text : ""} ${HC.outDur(s).toFixed(1)}s`;
       const fb = s.fb === 1 ? "👍" : s.fb === -1 ? "👎" : "";
-      return `<div class="shot ${s.mode === "move" ? "mv" : "st"} ${selSet.has(s.id) ? "on" : ""}" style="left:${x0}px;width:${w}px" data-id="${s.id}" draggable="true" tabindex="0" title="${esc((c ? c.name : "缺少素材") + "  " + lab)}">
+      return `<div class="shot ${s.mode === "move" ? "mv" : "st"} ${selSet.has(s.id) ? "on" : ""}" style="left:${x0}px;width:${w}px" data-id="${s.id}" tabindex="0" title="${esc((c ? c.name : "缺少素材") + "  " + lab)}">
         <span class="h l" data-trim="l" title="拖曳修剪開頭"></span><span class="h r" data-trim="r" title="拖曳修剪結尾"></span>${fb ? `<span class="fbk">${fb}</span>` : ""}
         <span class="k"></span>${i && s.tr && s.tr.type !== "cut" ? `<span class="trk ${s.tr.type === "black" ? "black" : ""}" title="轉場：${HC.trInfo(s.tr.type).name}"></span>` : ""}${s.stab && w > 56 ? `<span class="stb">${HC.stabFailed(s) ? "防抖失敗" : HC.stabReady(s) ? "防抖" : "防抖…"}</span>` : ""}<span class="lb">${i + 1}. ${esc(lab)}</span></div>`;
     }).join("");
@@ -320,8 +407,210 @@
     presetHint();
     $("scrub").max = Math.max(1, Math.round(total * 10));
     renderBeatInfo();
+    renderLanes();
     movePlayhead(R.T);
   }
+
+  /* ---------- 文字、特效、音樂、環境音軌 ---------- */
+  const LX = 64;   // 軌道名稱的寬度
+  let selItem = null;   // { kind, id }
+  // 每個項目在時間軸上的位置（文字可以跟著某個鏡頭）
+  function itemsOf(kind) {
+    const S_ = S(), { starts, total } = HC.timeline(), out = [];
+    if (kind === "text") {
+      const T_ = S_.title;
+      if (T_.template !== "none" && T_.main && total) out.push({ kind: "title", id: "title", a: T_.at || 0, b: Math.min(total, (T_.at || 0) + (T_.dur || 5)), label: "開頭：" + T_.main });
+      const E = S_.ending;
+      if (E.template !== "none" && E.main && total) { const st = Math.max(0, total - E.dur - (S_.out.fo || 0) * 0.5); out.push({ kind: "ending", id: "ending", a: st, b: total, label: "片尾：" + E.main }); }
+      for (const t of S_.texts) { const [a, b] = textSpan(t, starts, total); out.push({ kind: "text", id: t.id, a, b, label: (t.shotId ? "🔗 " : "") + (t.text || "（空白文字）") }); }
+    } else if (kind === "fx") {
+      for (const f of S_.fxItems) { const [a, b] = HC.spanOf(f, total); out.push({ kind: "fx", id: f.id, a, b, label: `${(HC.EFFECTS.find((e) => e.id === f.fx) || {}).name || f.fx} ${Math.round((f.str ?? 0.6) * 100)}%` }); }
+    } else if (kind === "music") {
+      if (S_.music.url) { const [a, b] = R.music.musicSpan(); out.push({ kind: "music", id: "music", a, b, label: "♪ " + (S_.music.name || "").replace(/\.[^.]+$/, "") }); }
+    } else if (kind === "amb") {
+      S_.amb.forEach((x, k) => { const [a, b] = HC.spanOf(x, total); out.push({ kind: "amb", id: x.key, a, b, row: k, label: "〰 " + x.name }); });
+    }
+    return out;
+  }
+  const textSpan = HC.textSpan;
+  function renderLanes() {
+    const p = pps(), ids = new Set(S().shots.map((s) => s.id));
+    S().texts = S().texts.filter((t) => !t.shotId || ids.has(t.shotId));   // 鏡頭刪掉了，跟著它的文字也一起刪
+    const html = (list) => list.map((it) => `<div class="it ${it.kind} ${selItem && selItem.id === it.id ? "on" : ""}" data-kind="${it.kind}" data-iid="${it.id}" style="left:${it.a * p}px;width:${Math.max(14, (it.b - it.a) * p - 2)}px${it.row != null ? `;top:${it.row * 30 + 3}px;bottom:auto;height:24px` : ""}" tabindex="0" title="${esc(it.label)}（拖曳移動、拖邊緣改長度、點一下編輯）">${it.kind !== "ending" ? `<span class="h l" data-itrim="l"></span>` : `<span class="h l" data-itrim="l"></span>`}<span class="lb">${esc(it.label)}</span>${it.kind !== "ending" ? `<span class="h r" data-itrim="r"></span>` : ""}</div>`).join("");
+    $("laneText").innerHTML = html(itemsOf("text"));
+    $("laneFx").innerHTML = html(itemsOf("fx"));
+    $("laneMusic").innerHTML = html(itemsOf("music")) || `<span class="muted" style="font-size:12px;line-height:30px;padding-left:8px">把音樂庫的音樂拖到這裡</span>`;
+    const amb = itemsOf("amb");
+    $("laneAmb").innerHTML = html(amb) || `<span class="muted" style="font-size:12px;line-height:30px;padding-left:8px">把環境音拖到這裡</span>`;
+    $("laneAmb").parentElement.style.height = Math.max(1, S().amb.length) * 30 + "px";
+  }
+  /* 依項目種類改時間：move = 整段移動；l／r = 修剪左右邊 */
+  function setItemTime(kind, id, op, o, d) {
+    const S_ = S(), { total } = HC.timeline();
+    const fix = (x) => { if (!(x.dur > 0)) x.dur = +(total - (x.start || 0)).toFixed(2); };   // 「到結束」的項目一動就改成固定長度
+    if (kind === "text" || kind === "fx" || kind === "amb") {
+      const x = kind === "text" ? S_.texts.find((t) => t.id === id) : kind === "fx" ? S_.fxItems.find((f) => f.id === id) : S_.amb.find((a) => a.key === id);
+      if (!x) return;
+      if (x.shotId) { const { starts } = HC.timeline(), [a, b] = textSpan(x, starts, total); x.start = a; x.dur = b - a; delete x.shotId; }
+      if (op === "move") { x.start = +Math.max(0, o.start + d).toFixed(2); if (o.dur > 0) x.dur = o.dur; }
+      else if (op === "l") { const end = o.start + (o.dur > 0 ? o.dur : total - o.start); x.start = +HC.clamp(o.start + d, 0, end - 0.5).toFixed(2); x.dur = +(end - x.start).toFixed(2); }
+      else { fix(x); x.dur = +Math.max(0.5, (o.dur > 0 ? o.dur : total - o.start) + d).toFixed(2); }
+    } else if (kind === "music") {
+      const M = S_.music;
+      if (op === "move") M.at = +Math.max(0, o.at + d).toFixed(2);
+      else if (op === "l") { const dd = HC.clamp(d, -Math.min(o.at, o.off), (o.len || 1e9) - 1); M.at = +(o.at + dd).toFixed(2); M.off = +(o.off + dd).toFixed(2); if (o.len) M.len = +(o.len - dd).toFixed(2); }
+      else { const base = o.len || (R.music.musicSpan()[1] - o.at); M.len = +Math.max(1, base + d).toFixed(2); }
+    } else if (kind === "title") {
+      const T_ = S_.title;
+      if (op === "move") T_.at = +Math.max(0, (o.at || 0) + d).toFixed(2);
+      else if (op === "r") T_.dur = +Math.max(2, o.dur + d).toFixed(1);
+      else { const end = (o.at || 0) + o.dur; T_.at = +HC.clamp((o.at || 0) + d, 0, end - 2).toFixed(2); T_.dur = +(end - T_.at).toFixed(1); }
+    } else if (kind === "ending") {
+      if (op === "l") S_.ending.dur = +HC.clamp(o.dur - d, 2, 15).toFixed(1);
+    }
+  }
+  const itemSnapshot = (kind, id) => {
+    const S_ = S();
+    if (kind === "text") return { ...S_.texts.find((t) => t.id === id) };
+    if (kind === "fx") return { ...S_.fxItems.find((f) => f.id === id) };
+    if (kind === "amb") { const a = S_.amb.find((x) => x.key === id); return { start: a.start || 0, dur: a.dur || 0 }; }
+    if (kind === "music") return { at: S_.music.at || 0, off: S_.music.off || 0, len: S_.music.len || 0 };
+    if (kind === "title") return { at: S_.title.at || 0, dur: S_.title.dur };
+    if (kind === "ending") return { dur: S_.ending.dur };
+    return {};
+  };
+
+  /* ---------- 拖曳 ---------- */
+  function bindDrag() {
+    const track = $("tlTrack");
+    const xToT = (x) => (x - track.getBoundingClientRect().left - LX) / pps();
+    const snapPts = () => { const { starts, total } = HC.timeline(); return [R.T, 0, total, ...starts, ...(HC.beatTimes ? HC.beatTimes() : [])]; };
+    const snapT = (t) => { const p = pps(); for (const s of snapPts()) if (Math.abs((s - t) * p) < 7) return s; return t; };
+    let drag = null, ghost = null, scrubRaf = 0;
+    const laneAt = (x, y) => { const el = document.elementFromPoint(x, y); const l = el && el.closest(".lane"); return l ? l.dataset.lane : null; };
+    // 插入位置：游標在哪兩個鏡頭中間
+    const insertIndex = (T) => { const { starts } = HC.timeline(), sh = S().shots; let k = 0; for (let i = 0; i < sh.length; i++) if (T > starts[i] + HC.outDur(sh[i]) / 2) k = i + 1; return k; };
+    const boundaryT = (k) => { const { starts, total } = HC.timeline(); return k >= S().shots.length ? total : starts[k]; };
+    const showMark = (T) => { const m = $("dropMark"); if (T == null) { m.classList.add("hidden"); return; } m.classList.remove("hidden"); m.style.left = LX + T * pps() + "px"; };
+    const makeGhost = (cls, html, bg) => { ghost = document.createElement("div"); ghost.className = "ghost " + cls; ghost.innerHTML = html; if (bg) ghost.style.backgroundImage = `url(${bg})`; document.body.appendChild(ghost); };
+    const clearLanes = () => document.querySelectorAll(".lane.dropok").forEach((l) => l.classList.remove("dropok"));
+
+    const startScrub = (e) => {
+      drag = { type: "scrub" };
+      R.stop();
+      const T = HC.clamp(xToT(e.clientX), 0, HC.timeline().total); R.T = T; movePlayhead(T); seek(T);
+    };
+    track.addEventListener("pointerdown", (e) => {
+      if (R.exporting || e.button > 0) return;
+      const it = e.target.closest(".it"), shot = e.target.closest(".shot");
+      if (it) {
+        e.preventDefault();
+        const kind = it.dataset.kind, id = it.dataset.iid, h = e.target.closest("[data-itrim]");
+        drag = { type: "item", kind, id, op: h ? h.dataset.itrim : "move", x0: e.clientX, y0: e.clientY, o: itemSnapshot(kind, id), started: false };
+        return;
+      }
+      if (shot) { drag = { type: "shot", id: shot.dataset.id, x0: e.clientX, y0: e.clientY, started: false }; return; }
+      if (e.target.closest(".ruler") || e.target.closest(".lane") || e.target === track) startScrub(e);
+    });
+    // 從素材區拖進時間軸
+    $("binList").addEventListener("pointerdown", (e) => {
+      if (e.button > 0 || e.target.closest("button,select,input")) return;
+      const el = e.target.closest(".clip"); if (!el) return;
+      const c = HC.clip(el.dataset.id); if (!c || c.missing) return;
+      drag = { type: "clip", id: c.id, x0: e.clientX, y0: e.clientY, started: false, img: (el.querySelector("img") || {}).src };
+    });
+    // 從音樂庫拖進音樂軌／環境音軌
+    $("libList").addEventListener("pointerdown", (e) => {
+      if (e.button > 0 || e.target.closest("button")) return;
+      const el = e.target.closest(".li"); if (!el) return;
+      const id = (el.querySelector("[data-use]") || {}).dataset; if (!id || !id.use) return;
+      drag = { type: "audio", id: id.use, x0: e.clientX, y0: e.clientY, started: false, name: (el.querySelector("b") || {}).textContent || "" };
+    });
+
+    window.addEventListener("pointermove", (e) => {
+      if (!drag) return;
+      if (drag.type === "scrub") {
+        const T = HC.clamp(xToT(e.clientX), 0, HC.timeline().total); R.T = T; movePlayhead(T);
+        if (!scrubRaf) scrubRaf = requestAnimationFrame(() => { scrubRaf = 0; seek(R.T); });
+        return;
+      }
+      if (!drag.started) {
+        if (Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 6) return;
+        drag.started = true; R.stop();
+        document.body.classList.add("nosel"); getSelection().removeAllRanges();
+        if (drag.type === "item") HC.commit();
+        if (drag.type === "shot") document.querySelector(`.shot[data-id="${drag.id}"]`)?.classList.add("dragging");
+        if (drag.type === "clip") makeGhost("", esc((HC.clip(drag.id) || {}).name || ""), drag.img);
+        if (drag.type === "audio") makeGhost("audio", "♪ " + esc(drag.name));
+      }
+      e.preventDefault();
+      if (ghost) { ghost.style.left = e.clientX + "px"; ghost.style.top = e.clientY + "px"; }
+      const T = xToT(e.clientX);
+      if (drag.type === "item") {
+        const d = T - xToT(drag.x0);
+        // 吸附：用項目的開頭（或被拖的那一邊）去對齊
+        const ref = drag.kind === "music" ? (drag.op === "r" ? R.music.musicSpan()[1] : drag.o.at) : drag.op === "r" ? null : drag.o.start ?? drag.o.at ?? 0;
+        let dd = d;
+        if (ref != null) dd = snapT(ref + d) - ref;
+        setItemTime(drag.kind, drag.id, drag.op, drag.o, dd);
+        renderLanes(); refresh();
+      } else if (drag.type === "shot") {
+        showMark(boundaryT(insertIndex(T)));
+      } else if (drag.type === "clip" || drag.type === "audio") {
+        clearLanes();
+        const lane = laneAt(e.clientX, e.clientY);
+        if (drag.type === "clip" && lane === "video") { document.querySelector('.lane[data-lane="video"]').classList.add("dropok"); showMark(boundaryT(insertIndex(T))); }
+        else if (drag.type === "audio" && (lane === "music" || lane === "amb")) { document.querySelector(`.lane[data-lane="${lane}"]`).classList.add("dropok"); showMark(Math.max(0, snapT(T))); }
+        else showMark(null);
+      }
+    }, { passive: false });
+
+    const end = async (e) => {
+      const d = drag; drag = null;
+      if (!d) return;
+      showMark(null); clearLanes(); if (ghost) { ghost.remove(); ghost = null; }
+      document.body.classList.remove("nosel");
+      document.querySelectorAll(".shot.dragging").forEach((x) => x.classList.remove("dragging"));
+      if (d.type === "scrub") { seek(R.T); return; }
+      if (!d.started) {
+        if (d.type === "item") selectItem(d.kind, d.id);
+        return;   // 鏡頭和素材的點擊交給原本的 click
+      }
+      trimDone = performance.now(); binDragDone = performance.now();
+      if (!e || e.type === "pointercancel") { renderTimeline(); return; }
+      const T = xToT(e.clientX), lane = laneAt(e.clientX, e.clientY);
+      if (d.type === "item") { renderTimeline(); selectItem(d.kind, d.id); refresh(); }
+      else if (d.type === "shot") {
+        const a = S().shots, from = a.findIndex((x) => x.id === d.id); let to = insertIndex(T);
+        if (from < 0 || to === from || to === from + 1) return;
+        HC.commit();
+        const [m] = a.splice(from, 1); if (to > from) to--; a.splice(to, 0, m);
+        renderTimeline(); select(m.id); refresh();
+        toast(`已移到第 ${to + 1} 個`);
+      } else if (d.type === "clip" && lane === "video") {
+        const s = HC.shotFromClip(HC.clip(d.id));
+        if (!s) return toast("這支素材還在分析，請稍等");
+        HC.commit();
+        const k = insertIndex(T);
+        S().shots.splice(k, 0, s);
+        renderTimeline(); select(s.id); HC.stabQueue(stabDone);
+        const { starts } = HC.timeline(); seek(starts[k] + 0.02);
+        toast(`已加入第 ${k + 1} 個鏡頭`);
+      } else if (d.type === "audio" && (lane === "music" || lane === "amb")) {
+        HC.commit();
+        await HC.libDrop(d.id, lane, Math.max(0, snapT(T)));
+        renderTimeline(); refresh();
+      }
+    };
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", () => end(null));
+    // 鍵盤：選取的項目用 ← → 微調位置、Delete 刪除
+    track.addEventListener("keydown", (e) => {
+      const it = e.target.closest(".it"); if (!it) return;
+      if (e.key === "Enter") { selectItem(it.dataset.kind, it.dataset.iid); e.preventDefault(); }
+    });
+  }
+  let binDragDone = 0;
   function movePlayhead(T) {
     $("playhead").style.left = T * pps() + "px";
     const { total } = HC.timeline();
@@ -478,7 +767,8 @@
       app: "housing-cut", version: 1, name: $("projName").value,
       clips: s.clips.map((c) => ({ id: c.id, name: c.name, time: c.time, dur: c.dur, excluded: c.excluded, sceneMark: c.sceneMark || "", stype: c.stype || "", tod: c.tod || "" })),
       shots: s.shots, title: s.title, ending: s.ending, look: s.look, out: s.out, auto: s.auto, wm: { ...s.wm, _img: undefined },
-      music: { name: s.music.name, vol: s.music.vol, off: s.music.off, fade: s.music.fade, lib: s.music.lib || "" },
+      music: { name: s.music.name, vol: s.music.vol, off: s.music.off, fade: s.music.fade, lib: s.music.lib || "", at: s.music.at || 0, len: s.music.len || 0 },
+      texts: s.texts || [], fxItems: s.fxItems || [],
       amb: HC.ambForSave(),
     }, null, 2);
   }
@@ -499,7 +789,9 @@
     if (o.wm) Object.assign(s.wm, o.wm);
     if (o.look) { s.look.filter = o.look.filter || "none"; s.look.filterStr = o.look.filterStr ?? 1; s.look.tintStr = o.look.tintStr ?? 1; Object.assign(s.look.fx, o.look.fx || {}); }
     if (s.title.pos === "center") s.title.pos = "auto";   // 舊版的「畫面中央」= 現在的「跟模板一樣」
-    Object.assign(s.music, { vol: o.music.vol, off: o.music.off, fade: o.music.fade });
+    Object.assign(s.music, { vol: o.music.vol, off: o.music.off, fade: o.music.fade, at: o.music.at || 0, len: o.music.len || 0 });
+    s.texts = o.texts || []; s.fxItems = o.fxItems || [];
+    HC.migrateTracks(s);
     // 開舊專案：音樂庫的音樂和音效直接從庫裡拿回來；自己的音樂檔要重新選
     if (!fromAutosave) {
       if (o.music.lib) HC.libMusicFile(o.music.lib).then((f) => f && setMusic(f, true, o.music.lib));
@@ -624,8 +916,10 @@
   }
   /* ---------- 特效縮圖 ---------- */
   let fxSel = "vignette", fxAnim = null;
+  // 特效軌上每種特效的強度（同一種有好幾段時取第一段）
+  const fxMap = () => { const m = {}; for (const it of S().fxItems || []) if (m[it.fx] == null) m[it.fx] = it.str; return m; };
   function renderFx() {
-    const fx = S().look.fx;
+    const fx = fxMap();
     $("fxTiles").innerHTML = HC.EFFECTS.map((e) => `<button class="tile ${fx[e.id] ? "on" : ""} ${e.id === fxSel ? "sel" : ""}" data-fxid="${e.id}" aria-pressed="${!!fx[e.id]}"><span class="pv"><canvas width="320" height="180" data-fxc="${e.id}"></canvas>${fx[e.id] ? `<span class="badge">${Math.round(fx[e.id] * 100)}%</span>` : ""}</span>${esc(e.name)}</button>`).join("");
     for (const e of HC.EFFECTS) drawFxThumb(e.id, 2.5);
     const v = fx[fxSel] || 0;
@@ -639,7 +933,7 @@
     const g = c.getContext("2d"), W = c.width, H = c.height;
     if (lookCanvas) g.drawImage(lookCanvas, 0, 0, W, H);
     else { const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, "#f2b07a"); gr.addColorStop(0.45, "#f2b07a"); gr.addColorStop(0.45, "#4f6f52"); gr.addColorStop(1, "#3a5240"); g.fillStyle = gr; g.fillRect(0, 0, W, H); }
-    HC.drawEffects(g, W, H, T, { [id]: S().look.fx[id] || 0.6 }, c, 3);
+    HC.drawEffects(g, W, H, T, { [id]: fxMap()[id] || 0.6 }, c, 3);
   }
   function animateFx(id) {
     cancelAnimationFrame(fxAnim);
@@ -905,8 +1199,7 @@
     const afterHistory = () => { syncForms(); renderTimeline(); select(cur() ? sel : null); refresh(); };
     $("undoBtn").onclick = () => { if (HC.undo()) afterHistory(); };
     $("redoBtn").onclick = () => { if (HC.redo()) afterHistory(); };
-    $("saveBtn").onclick = () => saveFile(($("projName").value || "housing") + ".json", projectJSON());
-    $("projIn").addEventListener("change", async (e) => { const f = e.target.files[0]; e.target.value = ""; if (!f) return; try { loadProject(JSON.parse(await f.text())); } catch (err) { toast("專案檔讀取失敗"); } });
+    HC.initProjects({ projectJSON, loadProject, setMusic, toast, saveFile, addFiles, getName: () => $("projName").value, setName: (v) => { $("projName").value = v; }, clearMusic: () => S().music.url && $("mClear").click() });
     $("exportBtn").onclick = doExport; $("exportBtn2").onclick = doExport;
 
     $("playBtn").onclick = () => { if (R.exporting) return; if (R.isPlaying()) R.stop(); else { HC.stabQueue(stabDone); const { total } = HC.timeline(); R.play(R.T >= total - 0.05 ? 0 : R.T); } };
@@ -932,6 +1225,7 @@
         renderBin(); toast("場景已調整，按「自動剪輯」套用到時間軸");
         return;
       }
+      if (binDragDone > performance.now() - 300) return;   // 剛剛是拖曳，不是點擊
       const el = e.target.closest(".clip"); if (el) openSource(HC.clip(el.dataset.id));
     });
     $("binList").addEventListener("change", (e) => {
@@ -1048,7 +1342,16 @@
     $("sStab").addEventListener("change", (e) => edit((s) => { s.stab = e.target.checked; if (s.stabStr == null) s.stabStr = S().auto.stabStr; }));
     $("sStabStr").addEventListener("input", (e) => edit((s) => s.stabStr = e.target.value / 100, true));
     $("sStabStr").addEventListener("change", () => { editing = false; });
-    $("sText").addEventListener("input", (e) => edit((s) => s.text = e.target.value, true));
+    // 鏡頭文字 = 文字軌上「跟著這個鏡頭」的一段文字
+    $("sText").addEventListener("input", (e) => {
+      const s = cur(); if (!s) return;
+      if (!editing) { HC.commit(); editing = true; }
+      let t = linkedText(s);
+      if (!t && e.target.value) { t = { id: HC.uid("t"), shotId: s.id, text: "", style: "caption", pos: "center", start: 0, dur: 0 }; S().texts.push(t); }
+      if (t) { t.text = e.target.value; if (!t.text) S().texts = S().texts.filter((x) => x !== t); }
+      delete s.text;
+      renderLanes(); refresh();
+    });
     $("sText").addEventListener("change", () => { editing = false; });
     $("sHere").onclick = () => { const s = cur(); if (!s) return; const at = HC.shotAt(R.T); if (at && S().shots[at.i] === s) edit((x) => { const o = at.off * x.speed; x.start += o; x.dur -= o; }); else toast("播放位置不在這個鏡頭裡"); };
     $("sSrc").onclick = () => { const s = cur(); if (s) openSource(HC.clip(s.clipId), s.start); };
@@ -1225,7 +1528,7 @@
       renderTimeline();
       const el = document.querySelector(`.shot[data-id="${s.id}"]`); if (el) el.classList.add("trimming");
       const T = HC.timeline().starts[i] + (side === "r" ? HC.outDur(s) : 0);
-      trim.tip.style.left = T * p + "px"; trim.tip.textContent = side === "r" ? `長度 ${HC.outDur(s).toFixed(1)} 秒` : `素材從 ${HC.fmt(s.start)} 開始`;
+      trim.tip.style.left = LX + T * p + "px"; trim.tip.textContent = side === "r" ? `長度 ${HC.outDur(s).toFixed(1)} 秒` : `素材從 ${HC.fmt(s.start)} 開始`;
       $("tlTrack").appendChild(trim.tip);
     });
     const endTrim = () => {
@@ -1236,23 +1539,28 @@
     };
     window.addEventListener("pointerup", endTrim); window.addEventListener("pointercancel", endTrim);
     shotsEl.addEventListener("keydown", (e) => { const el = e.target.closest(".shot"); if (el && e.key === "Enter") el.click(); });
-    let dragId = null;
-    shotsEl.addEventListener("dragstart", (e) => { const el = e.target.closest(".shot"); if (!el || trim) { e.preventDefault(); return; } dragId = el.dataset.id; el.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", dragId); });
-    shotsEl.addEventListener("dragend", () => { dragId = null; document.querySelectorAll(".shot").forEach((x) => x.classList.remove("dragging", "drop-before")); });
-    shotsEl.addEventListener("dragover", (e) => { if (!dragId) return; e.preventDefault(); e.stopPropagation(); document.querySelectorAll(".shot").forEach((x) => x.classList.remove("drop-before")); const el = e.target.closest(".shot"); if (el) el.classList.add("drop-before"); });
-    shotsEl.addEventListener("drop", (e) => {
-      if (!dragId) return;
-      e.preventDefault(); e.stopPropagation();
-      const a = S().shots, from = a.findIndex((x) => x.id === dragId), el = e.target.closest(".shot");
-      let to = el ? a.findIndex((x) => x.id === el.dataset.id) : a.length;
-      if (from < 0 || to === from) return;
-      HC.commit();
-      const [m] = a.splice(from, 1); if (to > from) to--; a.splice(to, 0, m);
-      renderTimeline(); select(m.id); refresh();
+    bindDrag();
+    // 項目表單
+    $("itemForm").addEventListener("input", itemInput);
+    $("itemForm").addEventListener("change", (e) => { itemInput(e); editing = false; renderItemForm(); });
+    $("itemForm").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-act]"); if (!b) return;
+      if (b.dataset.act === "del") deleteItem();
+      else if (b.dataset.act === "close") { clearItem(); $("shotEmpty").classList.remove("hidden"); renderLanes(); }
+      else if (b.dataset.act === "goTitle") document.querySelector('[data-tab="title"]').click();
     });
-    const trackSeek = (e) => { if (e.target.closest(".shot")) return; const r = $("tlTrack").getBoundingClientRect(); const T = HC.clamp((e.clientX - r.left) / pps(), 0, HC.timeline().total); R.T = T; movePlayhead(T); seek(T); };
-    $("ruler").addEventListener("click", trackSeek);
-    $("tlTrack").addEventListener("click", trackSeek);
+    // 時間軸上方：在播放位置加文字、特效
+    $("addText").onclick = () => {
+      HC.commit();
+      const t = { id: HC.uid("t"), text: "新文字", sub: "", style: "lower", pos: "bottom", start: +R.T.toFixed(2), dur: 4 };
+      S().texts.push(t); renderTimeline(); selectItem("text", t.id); refresh();
+      setTimeout(() => { const i = $("itemForm").querySelector('[data-k="text"]'); if (i) { i.focus(); i.select(); } }, 50);
+    };
+    $("addFx").onclick = () => {
+      HC.commit();
+      const x = { id: HC.uid("f"), fx: fxSel || "petals", str: 0.6, start: +R.T.toFixed(2), dur: 5 };
+      S().fxItems.push(x); renderTimeline(); selectItem("fx", x.id); refresh();
+    };
     $("tlZoom").addEventListener("input", renderTimeline);
 
     // 自動剪輯設定
@@ -1362,17 +1670,19 @@
     $("fTiles").addEventListener("click", (e) => { const b = e.target.closest("[data-filter]"); if (!b) return; HC.commit(); S().look.filter = b.dataset.filter; renderTiles(); refresh(); });
     $("fxTiles").addEventListener("click", (e) => {
       const b = e.target.closest("[data-fxid]"); if (!b) return;
-      const id = b.dataset.fxid, fx = S().look.fx;
+      const id = b.dataset.fxid, fx = fxMap(), F = S().fxItems;
       HC.commit();
-      // 第一次點：選取並開啟；已選取時再點：關閉
-      if (fxSel === id && fx[id]) fx[id] = 0; else { fxSel = id; if (!fx[id]) fx[id] = +$("fxStr").value / 100 || 0.6; }
-      fxSel = id; renderFx(); refresh();
+      // 第一次點：選取並開啟（整支影片，之後可以在特效軌上拖動、修剪）；已選取時再點：關閉
+      if (fxSel === id && fx[id] != null) S().fxItems = F.filter((x) => x.fx !== id);
+      else if (fx[id] == null) F.push({ id: HC.uid("f"), fx: id, str: +$("fxStr").value / 100 || 0.6, start: 0, dur: 0 });
+      fxSel = id; renderFx(); renderTimeline(); refresh();
     });
     $("fxTiles").addEventListener("pointerover", (e) => { const b = e.target.closest("[data-fxid]"); if (b) animateFx(b.dataset.fxid); });
     $("fxTiles").addEventListener("pointerleave", () => { animateFx(null); for (const x of HC.EFFECTS) drawFxThumb(x.id, 2.5); });
     $("fxStr").addEventListener("input", () => {
-      const v = +$("fxStr").value / 100, fx = S().look.fx;
-      fx[fxSel] = v;
+      const v = +$("fxStr").value / 100;
+      if (!S().fxItems.some((x) => x.fx === fxSel)) S().fxItems.push({ id: HC.uid("f"), fx: fxSel, str: v, start: 0, dur: 0 });
+      for (const it of S().fxItems) if (it.fx === fxSel) it.str = v;
       $("fxStrV").textContent = `${HC.EFFECTS.find((x) => x.id === fxSel).name} ${Math.round(v * 100)}%`;
       const b = document.querySelector(`[data-fxid="${fxSel}"]`);
       if (b) { b.classList.add("on"); b.setAttribute("aria-pressed", "true"); let bd = b.querySelector(".badge"); if (!bd) { bd = document.createElement("span"); bd.className = "badge"; b.querySelector(".pv").appendChild(bd); } bd.textContent = Math.round(v * 100) + "%"; }
@@ -1431,6 +1741,7 @@
       if (k === "End") return go(total);
       if (k.toLowerCase() === "s") { e.preventDefault(); split(); return; }
       if (k === "Escape" && selSet.size > 1) { select(sel); return; }
+      if (selItem && (k === "Delete" || (k === "Backspace" && e.target.closest(".it")))) { e.preventDefault(); deleteItem(); return; }
       if (sel && (k === "Delete" || (k === "Backspace" && e.target.closest(".shot")))) { e.preventDefault(); del(); }
     });
     window.addEventListener("resize", () => { renderTimeline(); drawSrcGraph(); });

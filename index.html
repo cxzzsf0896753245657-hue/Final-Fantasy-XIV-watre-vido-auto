@@ -23,9 +23,8 @@
     <span class="sep"></span>
     <button class="btn" id="tourBtn" title="使用導覽" aria-label="使用導覽">？</button>
     <button class="btn" id="verBtn" title="把目前的剪輯存成一個版本，或回到之前的版本">版本</button>
-    <button class="btn" id="saveBtn">儲存專案</button>
-    <label class="btn" for="projIn">開啟專案</label>
-    <input id="projIn" type="file" accept=".json,application/json" hidden>
+    <button class="btn" id="saveBtn" title="存到「我的專案」（Ctrl+S）">儲存專案</button>
+    <button class="btn" id="openBtn" title="我的專案：依資料夾整理、可以搜尋">我的專案</button>
     <button class="btn accent" id="exportBtn" disabled>匯出影片</button>
   </div>
 </header>
@@ -66,7 +65,8 @@
     </nav>
 
     <div class="pane on" id="pane-shot">
-      <div id="shotEmpty" class="empty">在下方時間軸點一個鏡頭來調整。<br>或在左邊點素材，從素材裡挑片段加入。</div>
+      <div id="shotEmpty" class="empty">在下方時間軸點一個鏡頭、文字、特效或音樂來調整。<br>也可以把左邊的素材直接拖到時間軸上。</div>
+      <div id="itemForm" class="form hidden"></div>
       <div id="shotForm" class="form hidden">
         <p class="clipname" id="sClip"></p>
         <p class="multi hidden" id="sMulti"></p>
@@ -289,7 +289,7 @@
       <button class="btn" id="mSnap" disabled>把剪接點對齊拍點</button>
       <button class="btn" id="mClear">移除音樂</button>
 
-      <h3 class="sub">環境音效 <small class="muted">最多 3 層，整支影片循環播放</small></h3>
+      <h3 class="sub">環境音效 <small class="muted">最多 3 層，可以在時間軸上拖曳調整位置和長度</small></h3>
       <div id="ambList"></div>
       <div class="btnrow"><button class="btn" id="libSfxBtn">從音效庫加入</button><label class="btn" for="ambIn">用自己的音效檔</label></div>
       <input id="ambIn" type="file" accept="audio/*" hidden>
@@ -301,6 +301,7 @@
         </div>
         <input id="libQ" type="search" placeholder="搜尋，例如：蕭邦、雨、溪流">
         <div class="chips" id="libCats"></div>
+        <p class="hint">提示：把一首拖到下方時間軸的「音樂」或「環境音」軌，就會從放開的位置開始播。</p>
         <div class="liblist" id="libList"></div>
         <p class="hint" id="libNote"></p>
       </section>
@@ -363,13 +364,19 @@
       <details class="keys"><summary>快捷鍵</summary>
         <p><kbd>空白</kbd>／<kbd>K</kbd> 播放暫停 ・ <kbd>J</kbd> <kbd>L</kbd> 倒退／前進 2 秒 ・ <kbd>←</kbd> <kbd>→</kbd> 逐格（加 <kbd>Shift</kbd> 跳 1 秒）・ <kbd>Home</kbd> <kbd>End</kbd> 開頭／結尾<br>
         <kbd>S</kbd> 分割 ・ <kbd>Delete</kbd> 刪除 ・ <kbd>Ctrl</kbd>+<kbd>D</kbd> 複製 ・ <kbd>Ctrl</kbd>+<kbd>A</kbd> 全選 ・ <kbd>Ctrl</kbd>/<kbd>Shift</kbd>+點 多選 ・ <kbd>Ctrl</kbd>+<kbd>Z</kbd> 復原 ・ <kbd>Alt</kbd>+<kbd>C</kbd>／<kbd>V</kbd> 複製／貼上效果<br>
-        拖鏡頭左右邊緣可以修剪長度，會自動吸附到播放位置和音樂拍點。</p></details>
+        拖鏡頭左右邊緣可以修剪長度，會自動吸附到播放位置和音樂拍點。拖鏡頭本身可以換順序；把左邊的素材、音樂庫的音樂／音效拖到時間軸上可以直接加入。文字、特效、音樂、環境音各有自己的軌，可以拖動位置、拖邊緣改長度。</p></details>
+      <div class="tladd"><button class="btn" id="addText" title="在播放位置加一段文字">＋ 文字</button><button class="btn" id="addFx" title="在播放位置加一段特效">＋ 特效</button></div>
       <label class="zoom">縮放<input id="tlZoom" type="range" min="4" max="40" value="12" aria-label="時間軸縮放"></label>
     </div>
     <div class="tlscroll" id="tlScroll">
       <div class="tltrack" id="tlTrack">
-        <div class="ruler" id="ruler"></div>
-        <div class="shots" id="shots"></div>
+        <div class="ruler" id="ruler" title="點或拖曳移動播放位置"></div>
+        <div class="lane video" data-lane="video"><span class="lanehd">影片</span><div class="shots" id="shots"></div></div>
+        <div class="lane" data-lane="text"><span class="lanehd">文字</span><div class="lanebody" id="laneText"></div></div>
+        <div class="lane" data-lane="fx"><span class="lanehd">特效</span><div class="lanebody" id="laneFx"></div></div>
+        <div class="lane" data-lane="music"><span class="lanehd">音樂</span><div class="lanebody" id="laneMusic"></div></div>
+        <div class="lane amb" data-lane="amb"><span class="lanehd">環境音</span><div class="lanebody" id="laneAmb"></div></div>
+        <div class="dropmark hidden" id="dropMark"></div>
         <div class="playhead" id="playhead"></div>
       </div>
     </div>
@@ -378,6 +385,41 @@
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
+<div id="projDlg" class="pjdlg hidden" role="dialog" aria-modal="true" aria-label="我的專案">
+  <div class="pjwin">
+    <header class="pjhead">
+      <h2>我的專案</h2>
+      <input id="pjQ" type="search" placeholder="搜尋專案名稱、資料夾、標籤、素材檔名、文字…">
+      <select id="pjSort" aria-label="排序"><option value="updated">最近修改</option><option value="created">建立時間</option><option value="name">名稱</option><option value="len">影片長度</option></select>
+      <button class="btn primary" id="pjSaveCur">儲存目前的專案</button>
+      <button class="btn" id="pjClose" aria-label="關閉">關閉</button>
+    </header>
+    <form id="pjSave" class="pjsave hidden" onsubmit="return false">
+      <strong id="pjSaveTitle">儲存目前的專案</strong>
+      <label>名稱<input id="pjName" type="text" placeholder="例如：紫藤庭園 M 房"></label>
+      <label>資料夾<input id="pjFolder" type="text" list="pjFolderDl" placeholder="例如：客戶/小明（空白 = 最上層）"></label>
+      <datalist id="pjFolderDl"></datalist>
+      <label>標籤<input id="pjTags" type="text" placeholder="用、分隔，例如：和風、夜景"></label>
+      <div class="btnrow"><button type="button" class="btn primary" id="pjUpdate">更新</button><button type="button" class="btn" id="pjNew">儲存</button><button type="button" class="btn" id="pjCancel">取消</button></div>
+    </form>
+    <div class="pjbody">
+      <nav class="pjtree" aria-label="資料夾">
+        <div id="pjTree"></div>
+        <button class="btn" id="pjNewFolder">＋ 新資料夾</button>
+        <div class="pjimp">
+          <strong>匯入</strong>
+          <label class="btn" for="pjDirIn">選專案資料夾</label>
+          <input id="pjDirIn" type="file" webkitdirectory multiple hidden>
+          <label class="btn" for="pjZipIn">選 .zip／.json</label>
+          <input id="pjZipIn" type="file" accept=".zip,.json,application/zip,application/json" hidden>
+          <label class="check"><input type="checkbox" id="pjMedia"> 下載資料夾時包含影片素材（只限編輯中的專案，檔案會很大）</label>
+          <p class="hint">專案存在這個瀏覽器裡。換電腦或備份時用「下載資料夾」，裡面有 project.json、封面、你自己的音樂和音效。把專案拖到左邊的資料夾就能移動。</p>
+        </div>
+      </nav>
+      <main class="pjmain"><p class="muted" id="pjCrumb"></p><div class="pjgrid" id="pjGrid"></div></main>
+    </div>
+  </div>
+</div>
 <script src="js/state.js"></script>
 <script src="js/persist.js"></script>
 <script src="js/analyze.js"></script>
@@ -394,6 +436,7 @@
 <script src="js/vendor/webm-muxer.min.js"></script>
 <script src="js/mp4index.js"></script>
 <script src="js/export.js"></script>
+<script src="js/projects.js"></script>
 <script src="js/ui.js"></script>
 </body>
 </html>

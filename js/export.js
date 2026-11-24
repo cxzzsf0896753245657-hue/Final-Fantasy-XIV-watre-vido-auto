@@ -42,16 +42,16 @@
     const len = Math.ceil(total * SR), oc = new OfflineAudioContext(2, len, SR);
     const decode = async (url) => new OfflineAudioContext(2, 1, SR).decodeAudioData(await (await fetch(url)).arrayBuffer());
     const N = Math.max(2, Math.ceil(total / 0.05));
-    const add = (buf, levelAt, offset, loop) => {
+    const add = (buf, levelAt, offset, loop, at = 0) => {
       const src = oc.createBufferSource(); src.buffer = buf; src.loop = loop;
       const g = oc.createGain(), curve = new Float32Array(N);
       for (let i = 0; i < N; i++) curve[i] = levelAt((i / (N - 1)) * total);
       g.gain.setValueCurveAtTime(curve, 0, total);
       src.connect(g); g.connect(oc.destination);
-      src.start(0, offset);
+      src.start(Math.max(0, at), offset);
     };
-    if (M.url) { const b = await decode(M.url); add(b, (T) => R.music.level(T), Math.min(M.off, Math.max(0, b.duration - 0.01)), false); }
-    for (const a of A) { try { add(await decode(a.url), (T) => R.music.ambLevel(a, T), 0, true); } catch (e) {} }
+    if (M.url) { const b = await decode(M.url); add(b, (T) => R.music.level(T), Math.min(M.off, Math.max(0, b.duration - 0.01)), false, M.at || 0); }
+    for (const a of A) { try { add(await decode(a.url), (T) => R.music.ambLevel(a, T), 0, true, a.start || 0); } catch (e) {} }
     return oc.startRendering();
   }
 

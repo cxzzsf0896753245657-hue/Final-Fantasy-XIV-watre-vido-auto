@@ -58,12 +58,12 @@
     const hasMusic = !!S.music.url;
     const musicFile = hasMusic ? `assets/music.${extOf(S.music.name, "mp3")}` : null;
     // 環境音效：依長度重複排好幾段，做出循環
-    const amb = S.amb.filter((a) => a.dur > 0).map((a, k) => ({ ...a, file: `assets/ambience${k + 1}.${a.ext || "webm"}` }));
+    const amb = S.amb.filter((a) => a.adur > 0).map((a, k) => ({ ...a, file: `assets/ambience${k + 1}.${a.ext || "webm"}` }));
     const ambTags = amb.map((a, k) => {
-      const out = [];
-      for (let t = 0, j = 0; t < total - 0.05; t += a.dur, j++) {
-        const d = Math.min(a.dur, total - t);
-        out.push(`  <audio id="amb${k + 1}_${j}" data-start="${r3(t)}" data-duration="${r3(d)}" data-track-index="${5 + k}" data-media-start="0" data-volume="${a.vol}"${t === 0 ? ` data-fade-in="1.5"` : ""}${t + d >= total - 0.05 ? ` data-fade-out="${Math.max(1.5, S.music.fade)}"` : ""} src="${a.file}"></audio>`);
+      const out = [], [s0, e0] = HC.spanOf(a, total);
+      for (let t = s0, j = 0; t < e0 - 0.05; t += a.adur, j++) {
+        const d = Math.min(a.adur, e0 - t);
+        out.push(`  <audio id="amb${k + 1}_${j}" data-start="${r3(t)}" data-duration="${r3(d)}" data-track-index="${5 + k}" data-media-start="0" data-volume="${a.vol}"${t === s0 ? ` data-fade-in="1.5"` : ""}${t + d >= e0 - 0.05 ? ` data-fade-out="${Math.max(1.5, S.music.fade)}"` : ""} src="${a.file}"></audio>`);
       }
       return out.join("\n");
     }).join("\n");
@@ -94,7 +94,7 @@
       if (s.split) info.splits.push({ start: r3(starts[i]), dur: r3(od), labels: s.split.labels || ["白天", "夜晚"] });
     });
     const fonts = [S.title.font, "Noto Serif TC"];
-    const textForFonts = [S.title.main, S.title.sub, S.title.info, S.ending.main, S.ending.sub, ...shots.map((s) => s.text || "")].join("");
+    const textForFonts = [S.title.main, S.title.sub, S.title.info, S.ending.main, S.ending.sub, ...shots.map((s) => s.text || ""), ...(S.texts || []).map((t) => t.text + (t.sub || ""))].join("");
 
     const clipsHtml = shots.map((s, i) => {
       const f = [HC.adjCss(s), HC.filterCss(s.filter || S.look.filter, S.look.filterStr ?? 1)].filter(Boolean).join(" ");
@@ -155,7 +155,7 @@ html, body { width: ${W}px; height: ${H}px; overflow: hidden; background: #000; 
 ${clipsHtml}
   <div id="trov"></div>
   <canvas id="ov" class="clip" data-start="0" data-duration="${r3(total)}" data-track-index="3" width="${W}" height="${H}"></canvas>
-${hasMusic ? `  <audio id="music" data-start="0" data-duration="${r3(total)}" data-track-index="4" data-media-start="${r3(S.music.off)}" data-volume="${S.music.vol}" data-fade-in="0.5" data-fade-out="${S.music.fade}" src="${musicFile}"></audio>` : ""}
+${hasMusic ? `  <audio id="music" data-start="${r3(HC.R.music.musicSpan()[0])}" data-duration="${r3(HC.R.music.musicSpan()[1] - HC.R.music.musicSpan()[0])}" data-track-index="4" data-media-start="${r3(S.music.off)}" data-volume="${S.music.vol}" data-fade-in="0.5" data-fade-out="${S.music.fade}" src="${musicFile}"></audio>` : ""}
 ${ambTags}
 </div>
 <script>
@@ -261,6 +261,7 @@ ${amb.map((a) => `| ${a.name}（環境音效，循環） | ${a.file} |`).join("\
     }
     return (c ^ 0xffffffff) >>> 0;
   }
+  HC.zip = (entries, onProgress) => zip(entries, onProgress);
   async function zip(entries, onProgress) {
     const enc = new TextEncoder(), parts = [], central = [];
     let offset = 0, done = 0;

@@ -7,12 +7,12 @@
 */
 {
   const HC = window.HC;
-  const DB = "housingcut", VER = 1;
+  const DB = "housingcut", VER = 2;
   let dbp = null;
   const open = () => dbp || (dbp = new Promise((res) => {
     try {
       const r = indexedDB.open(DB, VER);
-      r.onupgradeneeded = () => { const d = r.result; for (const s of ["proj", "ana", "handles"]) if (!d.objectStoreNames.contains(s)) d.createObjectStore(s); };
+      r.onupgradeneeded = () => { const d = r.result; for (const s of ["proj", "ana", "handles", "projects"]) if (!d.objectStoreNames.contains(s)) d.createObjectStore(s); };
       r.onsuccess = () => res(r.result);
       r.onerror = () => res(null);
       r.onblocked = () => res(null);
@@ -58,6 +58,13 @@
 
   /* ---------- 專案自動存檔 ---------- */
   let last = "", timer = null;
+  /* ---------- 專案庫：每個專案一筆（含封面、自己的音樂和音效檔） ---------- */
+  HC.projectsDB = {
+    all: async () => (await tx("projects", "readonly", (s) => s.getAll())) || [],
+    get: (id) => get("projects", id),
+    put: (rec) => put("projects", rec.id, rec),
+    del: (id) => del("projects", id),
+  };
   HC.autosave = {
     start(getJSON) {
       clearInterval(timer);

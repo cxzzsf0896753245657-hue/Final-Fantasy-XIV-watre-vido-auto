@@ -25,11 +25,11 @@
 
   /* ---------- 環境音效圖層 ---------- */
   const audioDur = (url) => new Promise((res) => { const a = new Audio(); a.preload = "metadata"; a.onloadedmetadata = () => res(a.duration || 0); a.onerror = () => res(0); a.src = url; });
-  HC.addAmb = async ({ blob, name, lib: libId, vol = 0.5, quiet, key: keep, ext }) => {
+  HC.addAmb = async ({ blob, name, lib: libId, vol = 0.5, quiet, key: keep, ext, start = 0, dur = 0 }) => {
     const S = HC.state;
     if (S.amb.length >= MAX_AMB) { api.toast(`環境音效最多 ${MAX_AMB} 層，先移除一層`); return false; }
     const url = URL.createObjectURL(blob), key = keep || HC.uid("a");
-    const a = { key, name, url, vol, lib: libId || "", ext: ext || (blob.name && blob.name.includes(".") ? blob.name.split(".").pop() : "webm"), dur: await audioDur(url) };
+    const a = { key, name, url, vol, lib: libId || "", ext: ext || (blob.name && blob.name.includes(".") ? blob.name.split(".").pop() : "webm"), adur: await audioDur(url), start, dur };   // adur = 音檔長度；start／dur = 在時間軸上的位置（dur 0 = 到影片結束）
     S.amb.push(a);
     if (!libId && !keep) HC.autosave.saveAmb(key, name, blob);
     renderAmb(); api.restart();
@@ -51,6 +51,21 @@
     $("libSfxBtn").disabled = A.length >= MAX_AMB;
   }
   HC.renderAmb = renderAmb;
+  HC.removeAmb = (key) => removeAmb(key);
+  /* 從音樂庫拖到時間軸：音樂軌 = 換背景音樂（從放開的位置開始）；環境音軌 = 加一層環境音 */
+  HC.libDrop = async (id, lane, T) => {
+    await HC.loadLibrary();
+    const it = HC.libItem(id); if (!it) return;
+    if (lane === "music") {
+      await api.setMusic(await libFile(it), true, id);
+      HC.state.music.at = +T.toFixed(2); HC.state.music.off = 0; HC.state.music.len = 0;
+      api.toast(`背景音樂換成「${it.zh || it.title}」，從 ${HC.fmt(T)} 開始`);
+    } else {
+      const ok = await HC.addAmb({ blob: await (await fetch(libUrl(it))).blob(), name: it.zh || it.title, lib: id, vol: it.vol || 0.5, ext: it.file.split(".").pop(), start: +T.toFixed(2), dur: 0, quiet: true });
+      if (ok) api.toast(`已加入環境音「${it.zh || it.title}」，從 ${HC.fmt(T)} 開始`);
+    }
+    render();
+  };
 
   /* ---------- 音樂庫 ---------- */
   function render() {
@@ -164,7 +179,7 @@
   };
 
   /* 存檔／還原用 */
-  HC.ambForSave = () => HC.state.amb.map((a) => ({ key: a.key, name: a.name, vol: a.vol, lib: a.lib, ext: a.ext }));
+  HC.ambForSave = () => HC.state.amb.map((a) => ({ key: a.key, name: a.name, vol: a.vol, lib: a.lib, ext: a.ext, start: a.start || 0, dur: a.dur || 0 }));
   HC.restoreAmb = async (list) => {
     for (const a of HC.state.amb) URL.revokeObjectURL(a.url);
     HC.state.amb = [];
@@ -173,8 +188,9 @@
       let blob = null;
       let ext;
       if (a.lib) { const it = HC.libItem(a.lib); if (it) { blob = await (await fetch(libUrl(it))).blob(); ext = it.file.split(".").pop(); } }
+      else if (a.blob) { blob = a.blob; HC.autosave.saveAmb(a.key, a.name, a.blob); }
       else { const r = await HC.autosave.amb(a.key); blob = r && r.blob; }
-      if (blob) await HC.addAmb({ blob, name: a.name, lib: a.lib, vol: a.vol, quiet: true, key: a.key, ext: ext || a.ext });
+      if (blob) await HC.addAmb({ blob, name: a.name, lib: a.lib, vol: a.vol, quiet: true, key: a.key, ext: ext || a.ext, start: a.start || 0, dur: a.dur || 0 });
     }
     renderAmb();
   };

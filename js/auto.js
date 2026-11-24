@@ -279,6 +279,22 @@
   };
   const sceneOf = (clipId) => { const c = HC.clip(clipId); return c && c.scene != null ? c.scene : 0; };
 
+  /* ---------- 從素材區拖進時間軸：挑這支素材裡還沒用到、分數最高的片段 ---------- */
+  HC.shotFromClip = (c) => {
+    if (!c || c.missing) return null;
+    const S = HC.state, opt = S.auto, T = HC.TUNE;
+    const mk = (start, dur, mode, speed) => ({ id: HC.uid("s"), clipId: c.id, start: +start.toFixed(2), dur: +dur.toFixed(2), mode, zoom: mode === "move" ? 0 : opt.zoom, speed, tr: { type: "cut", dur: 0 }, stab: mode === "move" && !!opt.stab, stabStr: opt.stabStr, why: ["你從素材區拖進來的：這支素材裡還沒用到、分數最高的片段"] });
+    if (!c.ana) { if (!c.dur) return null; const a = Math.min(opt.head || 0.5, c.dur / 4); return mk(a, Math.min(5, c.dur - a - 0.05), "in", 1); }
+    const used = S.shots.filter((s) => s.clipId === c.id);
+    const cands = HC.segmentClip(c, opt).filter((x) => !used.some((s) => x.a < s.start + s.dur && x.b > s.start)).sort((p, q) => q.score - p.score);
+    const x = cands[0];
+    if (!x) { const a = Math.min(opt.head || 0.5, c.dur / 4); return mk(a, Math.min(5, c.dur - a - 0.05), "in", 1); }
+    if (x.type === "M") return mk(x.a, Math.min(x.b - x.a, T.maxMove), "move", opt.speed);
+    const len = Math.min(x.b - x.a, T.longStill), a = x.a + (x.b - x.a - len) / 2, s = mk(a, len, "in", 1);
+    const lk = HC.shotLook && HC.shotLook(c.id, a, a + len); if (lk) { s.afx = lk.focus[0]; s.afy = lk.focus[1]; }
+    return s;
+  };
+
   /* ---------- 換一個：同一支素材（不夠就同一個場景）裡，挑還沒用到、分數最高的片段 ---------- */
   HC.swapShot = (s) => {
     const S = HC.state, opt = S.auto, c = HC.clip(s.clipId);

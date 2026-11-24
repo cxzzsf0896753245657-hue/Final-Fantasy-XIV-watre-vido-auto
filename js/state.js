@@ -15,8 +15,11 @@ window.HC = window.HC || {};
     ending: { template: "none", main: "Thank you for watching", sub: "", info: "", dur: 4 },
     wm: { on: false, kind: "text", text: "", img: "", corner: "br", size: 0.1, opacity: 0.75 },   // 浮水印
     look: { filter: "none", filterStr: 1, tintStr: 1, fx: { vignette: 0, glow: 0, bokeh: 0, petals: 0, grain: 0, letterbox: 0 } },
-    music: { name: "", url: "", vol: 0.8, off: 0, fade: 3, lib: "" },
-    amb: [],   // 環境音效（最多 3 層，整支影片循環播放）：{ key, name, url, vol, lib }
+    // 音樂軌：at = 從影片第幾秒開始，off = 從音樂第幾秒開始播，len = 播多久（0 = 播到影片結束）
+    music: { name: "", url: "", vol: 0.8, off: 0, fade: 3, lib: "", at: 0, len: 0 },
+    amb: [],   // 環境音軌（最多 3 層，循環播放）：{ key, name, url, vol, lib, start, dur（0 = 到影片結束） }
+    texts: [], // 文字軌：{ id, start, dur, text, sub, style: caption|lower|big, pos: center|top|bottom }
+    fxItems: [], // 特效軌：{ id, fx, str, start, dur（0 = 到影片結束） }
     out: { mode: "frames", fps: 30, aspect: "16:9", res: 1080, rate: 10, fi: 1.5, fo: 2.5 },
     auto: { len: 120, rhythm: 0.4, speed: 0.8, zoom: 0.16, tol: 0.5, head: 0.5, cursor: true, ui: true, stab: true, stabStr: 0.6, learn: true, cover: true, lateral: true, gap: 8, sceneLook: 0.5, trMode: "learn", trType: "cut", order: "learn", beat: true },
   };
@@ -137,6 +140,23 @@ window.HC = window.HC || {};
     return { i, off: T - starts[i], overlap };
   };
   /* 舊版的「黑場」勾選轉成新的轉場格式 */
+  /* 時間軸上「到影片結束」的項目（dur = 0）實際的長度 */
+  HC.spanOf = (it, total) => { const t = total ?? HC.timeline().total, a = it.start || 0; return [a, it.dur > 0 ? Math.min(t, a + it.dur) : t]; };
+  /* 文字的時間：跟著鏡頭的文字用那個鏡頭的位置 */
+  HC.textSpan = (t, starts, total) => {
+    if (t.shotId) { const sh = HC.state.shots, i = sh.findIndex((s) => s.id === t.shotId); if (i >= 0) { const st = starts || HC.timeline().starts; return [st[i], st[i] + HC.outDur(sh[i])]; } }
+    return HC.spanOf(t, total);
+  };
+  /* 舊專案：鏡頭上的文字 → 文字軌；整片特效 → 特效軌 */
+  HC.migrateTracks = (S) => {
+    S.texts = S.texts || []; S.fxItems = S.fxItems || [];
+    const { starts } = HC.timeline();
+    S.shots.forEach((s, i) => { if (s.text) { S.texts.push({ id: HC.uid("t"), shotId: s.id, start: +(starts[i] || 0).toFixed(2), dur: +HC.outDur(s).toFixed(2), text: s.text, style: "caption", pos: "center" }); delete s.text; } });
+    if (S.look && S.look.fx) for (const [fx, v] of Object.entries(S.look.fx)) if (v > 0 && !S.fxItems.some((x) => x.fx === fx)) S.fxItems.push({ id: HC.uid("f"), fx, str: v, start: 0, dur: 0 });
+    if (S.look) for (const k of Object.keys(S.look.fx || {})) S.look.fx[k] = 0;
+    S.music.at = S.music.at || 0; S.music.len = S.music.len || 0;
+    for (const a of S.amb) { a.start = a.start || 0; a.dur = a.dur || 0; }
+  };
   HC.migrateShot = (s) => {
     if (!s.tr) s.tr = s.dip ? { type: "black", dur: 1.2 } : { type: "cut", dur: 0 };
     delete s.dip;
@@ -152,11 +172,15 @@ window.HC = window.HC || {};
 
   /* ---------- 復原／重做 ---------- */
   const past = [], future = [];
-  const snap = () => JSON.stringify({ shots: HC.state.shots, title: HC.state.title, ending: HC.state.ending, look: HC.state.look, ex: HC.state.clips.map((c) => [c.id, c.excluded, c.sceneMark || "", c.stype || "", c.tod || ""]) });
+  const snap = () => JSON.stringify({ shots: HC.state.shots, title: HC.state.title, ending: HC.state.ending, look: HC.state.look, texts: HC.state.texts, fxItems: HC.state.fxItems,
+    mus: { at: HC.state.music.at, len: HC.state.music.len, off: HC.state.music.off }, amb: HC.state.amb.map((a) => [a.key, a.start || 0, a.dur || 0, a.vol]), ex: HC.state.clips.map((c) => [c.id, c.excluded, c.sceneMark || "", c.stype || "", c.tod || ""]) });
   const restore = (j) => {
     const o = JSON.parse(j);
     HC.state.shots = o.shots;
     HC.state.title = o.title; HC.state.ending = o.ending; HC.state.look = o.look;
+    HC.state.texts = o.texts || []; HC.state.fxItems = o.fxItems || [];
+    if (o.mus) Object.assign(HC.state.music, o.mus);
+    for (const [k, st, du, vol] of o.amb || []) { const a = HC.state.amb.find((x) => x.key === k); if (a) Object.assign(a, { start: st, dur: du, vol }); }
     for (const [id, ex, mk, st, td] of o.ex) { const c = HC.clip(id); if (c) { c.excluded = ex; c.sceneMark = mk || ""; c.stype = st || ""; c.tod = td || ""; } }
     HC.computeScenes && HC.computeScenes();
   };
