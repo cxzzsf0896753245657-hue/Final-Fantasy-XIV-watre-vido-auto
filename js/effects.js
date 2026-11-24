@@ -160,9 +160,10 @@ function installEffects() {
   }
   let glowC = null;
   /* fx：{vignette:0~1, ...}，frame：目前畫面（柔光要用，HyperFrames 的疊加層沒有，會略過） */
-  HC.drawEffects = (ctx, W, H, T, fx, frame) => {
+  /* uMul：縮圖用，把光點、花瓣放大一點才看得清楚 */
+  HC.drawEffects = (ctx, W, H, T, fx, frame, uMul = 1) => {
     if (!fx) return;
-    const u = H / 1080;
+    const u = H / 1080 * uMul;
     if (fx.glow && frame) {
       glowC = glowC || document.createElement("canvas");
       glowC.width = Math.round(W / 6); glowC.height = Math.round(H / 6);

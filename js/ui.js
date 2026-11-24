@@ -358,7 +358,7 @@
     $("sFilter").innerHTML = `<option value="">跟整支影片一樣</option>` + opts(HC.FILTERS);
     $("eTpl").innerHTML = opts(HC.TITLE_TEMPLATES.filter((t) => t.id !== "typewriter").map((t) => (t.id === "none" ? { ...t, name: "不要片尾" } : t)));
   }
-  let lookThumb = "";
+  let lookThumb = "", lookCanvas = null;
   function renderTiles() {
     $("trTiles").innerHTML = HC.TRANSITIONS.map((t) => `<button class="tile ${t.id === trSel ? "on" : ""}" data-tr="${t.id}" aria-pressed="${t.id === trSel}"><span class="pv ${t.id}"><span class="a"></span><span class="b"></span><span class="ov"></span></span>${esc(t.name)}</button>`).join("");
     $("trDurV").textContent = (+$("trDur").value).toFixed(1) + " 秒";
@@ -368,12 +368,39 @@
     const f = S().look.filter;
     $("fTiles").innerHTML = HC.FILTERS.map((x) => `<button class="tile ${x.id === f ? "on" : ""}" data-filter="${x.id}" aria-pressed="${x.id === f}"><span class="pv">${lookThumb ? `<img alt="" src="${lookThumb}" style="filter:${x.css || "none"}">` : `<span class="a" style="filter:${x.css || "none"}"></span>`}${x.tint ? `<span class="ov" style="opacity:1;background:${x.tint};mix-blend-mode:soft-light"></span>` : ""}</span>${esc(x.name)}</button>`).join("");
     $("fHint").textContent = HC.canFilter ? "" : "這個瀏覽器不支援畫布濾鏡，只會套用色調。建議用 Chrome 或 Edge。";
+    renderFx();
+  }
+  /* ---------- 特效縮圖 ---------- */
+  let fxSel = "vignette", fxAnim = null;
+  function renderFx() {
     const fx = S().look.fx;
-    $("fxList").innerHTML = HC.EFFECTS.map((e) => `<label class="fxrow"><span>${esc(e.name)}</span><input type="range" min="0" max="100" step="5" value="${Math.round((fx[e.id] || 0) * 100)}" data-fx="${e.id}" aria-label="${esc(e.name)}強度"><output>${fx[e.id] ? Math.round(fx[e.id] * 100) + "%" : "關"}</output></label>`).join("") +
-      `<p class="hint">柔光只在網頁匯出時有，HyperFrames 專案裡會略過。</p>`;
+    $("fxTiles").innerHTML = HC.EFFECTS.map((e) => `<button class="tile ${fx[e.id] ? "on" : ""} ${e.id === fxSel ? "sel" : ""}" data-fxid="${e.id}" aria-pressed="${!!fx[e.id]}"><span class="pv"><canvas width="320" height="180" data-fxc="${e.id}"></canvas>${fx[e.id] ? `<span class="badge">${Math.round(fx[e.id] * 100)}%</span>` : ""}</span>${esc(e.name)}</button>`).join("");
+    for (const e of HC.EFFECTS) drawFxThumb(e.id, 2.5);
+    const v = fx[fxSel] || 0;
+    $("fxStr").value = Math.round((v || 0.6) * 100);
+    $("fxStrV").textContent = `${HC.EFFECTS.find((e) => e.id === fxSel).name} ${v ? Math.round(v * 100) + "%" : "（關閉中）"}`;
+  }
+  // 縮圖：目前畫面 + 這個特效（關閉中的也顯示 60% 的樣子，讓你先看效果）
+  function drawFxThumb(id, T) {
+    const c = document.querySelector(`[data-fxc="${id}"]`);
+    if (!c) return;
+    const g = c.getContext("2d"), W = c.width, H = c.height;
+    if (lookCanvas) g.drawImage(lookCanvas, 0, 0, W, H);
+    else { const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, "#f2b07a"); gr.addColorStop(0.45, "#f2b07a"); gr.addColorStop(0.45, "#4f6f52"); gr.addColorStop(1, "#3a5240"); g.fillStyle = gr; g.fillRect(0, 0, W, H); }
+    HC.drawEffects(g, W, H, T, { [id]: S().look.fx[id] || 0.6 }, c, 3);
+  }
+  function animateFx(id) {
+    cancelAnimationFrame(fxAnim);
+    if (!id || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const t0 = performance.now();
+    const step = () => { drawFxThumb(id, 2.5 + (performance.now() - t0) / 1000); fxAnim = requestAnimationFrame(step); };
+    fxAnim = requestAnimationFrame(step);
   }
   function snapLook() {   // 用目前預覽畫面當濾鏡縮圖
-    try { const c = document.createElement("canvas"); c.width = 192; c.height = 108; c.getContext("2d").drawImage($("view"), 0, 0, 192, 108); lookThumb = c.toDataURL("image/jpeg", 0.7); } catch (e) { lookThumb = ""; }
+    try {
+      const c = document.createElement("canvas"); c.width = 320; c.height = 180; c.getContext("2d").drawImage($("view"), 0, 0, 320, 180);
+      lookThumb = c.toDataURL("image/jpeg", 0.75); lookCanvas = S().shots.length ? c : null;
+    } catch (e) { lookThumb = ""; lookCanvas = null; }
   }
   const seekEnd = () => { if (S().shots.length && !R.isPlaying()) { const { total } = HC.timeline(); seek(Math.max(0, total - (S().out.fo || 0) - 1)); } };
   function applyTr(targets) {
@@ -604,7 +631,24 @@
     $("tTiles").addEventListener("click", (e) => { const b = e.target.closest("[data-tpl]"); if (!b) return; HC.commit(); S().title.template = b.dataset.tpl; S().title.show = b.dataset.tpl !== "none"; renderTiles(); if (S().shots.length) { R.stop(); R.play(0); setTimeout(() => R.isPlaying() && R.T > S().title.dur + 1 && R.stop(), (S().title.dur + 1.5) * 1000); } });
     // 濾鏡與特效
     $("fTiles").addEventListener("click", (e) => { const b = e.target.closest("[data-filter]"); if (!b) return; HC.commit(); S().look.filter = b.dataset.filter; renderTiles(); refresh(); });
-    $("fxList").addEventListener("input", (e) => { const r = e.target.closest("[data-fx]"); if (!r) return; S().look.fx[r.dataset.fx] = r.value / 100; r.nextElementSibling.textContent = +r.value ? r.value + "%" : "關"; refresh(); });
+    $("fxTiles").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-fxid]"); if (!b) return;
+      const id = b.dataset.fxid, fx = S().look.fx;
+      HC.commit();
+      // 第一次點：選取並開啟；已選取時再點：關閉
+      if (fxSel === id && fx[id]) fx[id] = 0; else { fxSel = id; if (!fx[id]) fx[id] = +$("fxStr").value / 100 || 0.6; }
+      fxSel = id; renderFx(); refresh();
+    });
+    $("fxTiles").addEventListener("pointerover", (e) => { const b = e.target.closest("[data-fxid]"); if (b) animateFx(b.dataset.fxid); });
+    $("fxTiles").addEventListener("pointerleave", () => { animateFx(null); for (const x of HC.EFFECTS) drawFxThumb(x.id, 2.5); });
+    $("fxStr").addEventListener("input", () => {
+      const v = +$("fxStr").value / 100, fx = S().look.fx;
+      fx[fxSel] = v;
+      $("fxStrV").textContent = `${HC.EFFECTS.find((x) => x.id === fxSel).name} ${Math.round(v * 100)}%`;
+      const b = document.querySelector(`[data-fxid="${fxSel}"]`);
+      if (b) { b.classList.add("on"); b.setAttribute("aria-pressed", "true"); let bd = b.querySelector(".badge"); if (!bd) { bd = document.createElement("span"); bd.className = "badge"; b.querySelector(".pv").appendChild(bd); } bd.textContent = Math.round(v * 100) + "%"; }
+      drawFxThumb(fxSel, 2.5); refresh();
+    });
     document.querySelector('[data-tab="look"]').addEventListener("click", () => { snapLook(); renderTiles(); });
     // 自動剪輯：順序、轉場方式
     bindVal("aOrder", (t) => A().order = t.value, "change");
