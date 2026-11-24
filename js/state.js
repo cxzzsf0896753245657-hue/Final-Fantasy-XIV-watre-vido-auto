@@ -11,12 +11,12 @@ window.HC = window.HC || {};
   HC.state = {
     clips: [],
     shots: [],
-    title: { template: "classic", main: "FFXIV HOUSING", sub: "庭園 ・ Garden", info: "", font: "Noto Serif TC", size: 84, color: "#ffffff", accent: "#e9c46a", pos: "center", line: true, dur: 5.5 },
+    title: { template: "classic", main: "FFXIV HOUSING", sub: "庭園 ・ Garden", info: "", font: "Noto Serif TC", size: 84, color: "#ffffff", accent: "#e9c46a", pos: "auto", line: true, dur: 5.5 },
     ending: { template: "none", main: "Thank you for watching", sub: "", info: "", dur: 4 },
-    look: { filter: "none", fx: { vignette: 0, glow: 0, bokeh: 0, petals: 0, grain: 0, letterbox: 0 } },
+    look: { filter: "none", filterStr: 1, tintStr: 1, fx: { vignette: 0, glow: 0, bokeh: 0, petals: 0, grain: 0, letterbox: 0 } },
     music: { name: "", url: "", vol: 0.8, off: 0, fade: 3 },
-    out: { res: 1080, rate: 10, fi: 1.5, fo: 2.5 },
-    auto: { len: 120, rhythm: 0.4, speed: 0.8, zoom: 0.16, tol: 0.5, head: 0.5, cursor: true, ui: true, stab: true, stabStr: 0.6, learn: true, cover: true, lateral: true, gap: 8, trMode: "learn", trType: "cut", order: "learn" },
+    out: { mode: "frames", fps: 30, res: 1080, rate: 10, fi: 1.5, fo: 2.5 },
+    auto: { len: 120, rhythm: 0.4, speed: 0.8, zoom: 0.16, tol: 0.5, head: 0.5, cursor: true, ui: true, stab: true, stabStr: 0.6, learn: true, cover: true, lateral: true, gap: 8, sceneLook: 0.5, trMode: "learn", trType: "cut", order: "learn" },
   };
 
   let uid = 1;
@@ -74,12 +74,13 @@ window.HC = window.HC || {};
 
   /* ---------- 復原／重做 ---------- */
   const past = [], future = [];
-  const snap = () => JSON.stringify({ shots: HC.state.shots, title: HC.state.title, ending: HC.state.ending, look: HC.state.look, ex: HC.state.clips.map((c) => [c.id, c.excluded]) });
+  const snap = () => JSON.stringify({ shots: HC.state.shots, title: HC.state.title, ending: HC.state.ending, look: HC.state.look, ex: HC.state.clips.map((c) => [c.id, c.excluded, c.sceneMark || ""]) });
   const restore = (j) => {
     const o = JSON.parse(j);
     HC.state.shots = o.shots;
     HC.state.title = o.title; HC.state.ending = o.ending; HC.state.look = o.look;
-    for (const [id, ex] of o.ex) { const c = HC.clip(id); if (c) c.excluded = ex; }
+    for (const [id, ex, mk] of o.ex) { const c = HC.clip(id); if (c) { c.excluded = ex; c.sceneMark = mk || ""; } }
+    HC.computeScenes && HC.computeScenes();
   };
   HC.commit = () => { past.push(snap()); if (past.length > 80) past.shift(); future.length = 0; };
   HC.undo = () => { if (!past.length) return false; future.push(snap()); restore(past.pop()); return true; };

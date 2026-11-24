@@ -134,6 +134,26 @@ function installEffects() {
     { id: "bw", name: "黑白", css: "grayscale(1) contrast(1.1)" },
   ];
   HC.filterInfo = (id) => HC.FILTERS.find((f) => f.id === id) || HC.FILTERS[0];
+  /* 濾鏡強度：把每個參數往「沒效果」的值內插（0 = 原色，1 = 預設，2 = 加倍）。網頁和 HyperFrames 都用這個 */
+  const NEUTRAL = { brightness: 1, saturate: 1, contrast: 1, sepia: 0, grayscale: 0, "hue-rotate": 0 };
+  HC.filterCss = (id, str = 1) => {
+    const css = HC.filterInfo(id).css;
+    if (!css || str <= 0) return "";
+    if (Math.abs(str - 1) < 0.001) return css;
+    return css.replace(/([a-z-]+)\(([-\d.]+)(deg)?\)/g, (m, fn, v, unit) => {
+      const n = NEUTRAL[fn] ?? 0;
+      let x = n + (parseFloat(v) - n) * str;
+      if (fn === "sepia" || fn === "grayscale") x = Math.min(1, x);
+      if (!unit) x = Math.max(0, x);   // 色相旋轉可以是負的，其他不行
+      return `${fn}(${+x.toFixed(3)}${unit || ""})`;
+    });
+  };
+  /* 色調：疊一層柔光顏色。濃度 1 = 預設（定義裡的透明度 ×3，柔光混合本身很淡），2 = 加倍 */
+  HC.tintFill = (id, str = 1) => {
+    const f = HC.filterInfo(id);
+    if (!f.tint || str <= 0) return "";
+    return f.tint.replace(/[\d.]+\)$/, (m) => +Math.min(1, parseFloat(m) * 3 * str).toFixed(3) + ")");
+  };
   HC.canFilter = (() => { try { const c = document.createElement("canvas").getContext("2d"); return typeof c.filter === "string"; } catch (e) { return false; } })();
 
   /* ================= 特效（疊在畫面上的那一層） ================= */
@@ -276,12 +296,18 @@ function installEffects() {
     const mk = (text, w, s) => { ctx.font = font(w, s); const chars = [...(text || "")]; let x = 0; const out = chars.map((ch) => { const c = { ch, x0: x }; x += ctx.measureText(ch).width; return c; }); return { chars: out, width: x, font: font(w, s), size: s }; };
     const L1 = mk(o.main, 600, size), L2 = mk(o.sub, 400, sub), L3 = mk(o.info, 400, info);
     let x, y, align = "center";
-    switch (tpl.layout) {
+    switch (tpl.layout) {   // 模板預設的位置
       case "lowleft": x = W * 0.07; y = H * 0.70; align = "left"; break;
       case "left": x = W * 0.09; y = H * 0.44; align = "left"; break;
       case "cinema": x = W / 2; y = H * 0.74; break;
-      default: x = W / 2; y = o.pos === "top" ? H * 0.2 : o.pos === "lowleft" ? H * 0.72 : H * 0.42; if (o.pos === "lowleft") { x = W * 0.07; align = "left"; }
+      default: x = W / 2; y = H * 0.42;
     }
+    // 你選的位置：上下位置每個模板都適用；「左下角」也會改成靠左對齊
+    const P = o.pos === "center" && tpl.layout === "center" ? "auto" : o.pos || "auto";
+    if (P === "top") y = H * (tpl.bars ? 0.24 : 0.2);
+    else if (P === "middle") y = H * 0.42;
+    else if (P === "bottom") y = H * (tpl.bars ? 0.74 : 0.72);
+    else if (P === "lowleft") { y = H * 0.72; x = W * 0.07; align = "left"; }
     const left = (L) => align === "left" ? x : x - L.width / 2;
     lines.push({ ...L1, x: left(L1), y });
     let yy = y + size * 0.55;
@@ -385,7 +411,7 @@ function installEffects() {
   HC.drawOverlay = (ctx, W, H, info, frame) => {
     const { T, total } = info;
     HC.drawEffects(ctx, W, H, T, info.look && info.look.fx, frame);
-    if (info.look && info.look.filter) { const f = HC.filterInfo(info.look.filter); if (f.tint) { ctx.save(); ctx.globalCompositeOperation = "soft-light"; ctx.fillStyle = f.tint.replace(/[\d.]+\)$/, (m) => Math.min(1, parseFloat(m) * 3) + ")"); ctx.fillRect(0, 0, W, H); ctx.restore(); } }
+    if (info.look && info.look.filter) { const t = HC.tintFill(info.look.filter, info.look.tintStr ?? 1); if (t) { ctx.save(); ctx.globalCompositeOperation = "soft-light"; ctx.fillStyle = t; ctx.fillRect(0, 0, W, H); ctx.restore(); } }
     for (const c of info.captions || []) if (T >= c.start && T < c.start + c.dur) HC.drawCaption(ctx, W, H, c.text, T - c.start, c.dur, info.title.font);
     if (info.title) HC.drawTitleBlock(ctx, W, H, T, info.title, false);
     const E = info.ending;

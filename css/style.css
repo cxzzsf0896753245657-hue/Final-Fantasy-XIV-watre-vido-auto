@@ -54,7 +54,16 @@ label.btn{color:var(--ink);flex-direction:row;font-size:14px}
 .phead{display:flex;justify-content:space-between;align-items:baseline;padding:12px 14px 8px}
 .binlist{overflow-y:auto;flex:1;padding:0 8px}
 .clip{display:grid;grid-template-columns:96px minmax(0,1fr);gap:8px;padding:6px;border-radius:8px;cursor:pointer;border:1px solid transparent}
+.clip{position:relative}
 .clip:hover{background:var(--panel2)}
+.clip .split{position:absolute;right:6px;top:6px;font:inherit;font-size:11px;padding:2px 7px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--mute);cursor:pointer;opacity:0;transition:opacity .15s}
+.clip:hover .split,.clip:focus-within .split,.clip .split:focus-visible{opacity:1}
+.clip .split:hover{color:var(--ink);border-color:var(--accent)}
+.scene{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:10px 4px 2px;padding-top:8px;border-top:1px solid var(--line);font-size:12px;font-weight:600;color:var(--ink)}
+.scene:first-child{margin-top:0;border-top:0;padding-top:0}
+.scene small{font-weight:400;color:var(--mute);margin-left:8px}
+.scene button{font:inherit;font-size:11px;font-weight:400;padding:2px 8px;border-radius:10px;border:1px solid var(--line);background:none;color:var(--mute);cursor:pointer}
+.scene button:hover{color:var(--ink);border-color:var(--accent)}
 .clip.on{border-color:var(--still);background:var(--panel2)}
 .clip img,.clip .ph{width:96px;aspect-ratio:16/9;object-fit:cover;border-radius:4px;background:#000;display:block}
 .clip .nm{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

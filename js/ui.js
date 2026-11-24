@@ -56,6 +56,7 @@
         await HC.analyzeClip(c, (p) => { c.prog = p; if (performance.now() - lastDraw > 250) { lastDraw = performance.now(); updateClipRow(c); } });
         HC.segmentClip(c, S().auto);
         c.status = "done";
+        HC.computeScenes();
       } catch (e) { c.status = "error"; }
       renderBin();
       if (srcClip === c) drawSrcGraph();
@@ -70,9 +71,12 @@
   /* ---------- 素材區 ---------- */
   function renderBin() {
     const cs = S().clips;
-    $("binCount").textContent = cs.length ? `${cs.length} 支` : "";
-    $("binList").innerHTML = cs.map((c) => `
-      <div class="clip ${srcClip === c ? "on" : ""}" data-id="${c.id}" tabindex="0" role="button">
+    const nScene = HC.computeScenes();
+    $("binCount").textContent = cs.length ? `${cs.length} 支` + (nScene > 1 ? ` ・ ${nScene} 個場景` : "") : "";
+    const WHY = { time: "拍攝時間相隔較久", look: "畫面換了", mark: "你手動分的" };
+    $("binList").innerHTML = cs.map((c, i) => (nScene > 1 && (!i || c.scene !== cs[i - 1].scene) ? `
+      <div class="scene"><span>場景 ${c.scene + 1}${c.sceneWhy ? `<small>${WHY[c.sceneWhy]}</small>` : ""}</span>${i ? `<button data-join="${c.id}" title="把這個場景併回上一個場景">併回上一個</button>` : ""}</div>` : "") + `
+      <div class="clip ${srcClip === c ? "on" : ""}" data-id="${c.id}" tabindex="0" role="button">${i && c.scene === cs[i - 1].scene ? `<button class="split" data-split="${c.id}" title="從這支素材開始新的場景" aria-label="從這支素材開始新的場景">分場景</button>` : ""}
         <img alt="" data-thumb="${c.id}">
         <div><div class="nm" title="${esc(c.name)}">${esc(label(c))}</div>
         <div class="meta" data-meta="${c.id}">${esc(meta(c))}</div>
@@ -187,7 +191,7 @@
     $("sStabRow").classList.toggle("hidden", !s.stab);
   }
   const cur = () => S().shots.find((x) => x.id === sel);
-  const stabLabel = (s) => !s.stab ? "" : (HC.stabReady(s) ? "" : "（分析中…）") + Math.round((s.stabStr ?? 0.6) * 100) + "%";
+  const stabLabel = (s) => !s.stab ? "" : (HC.stabFailed(s) ? "（分析失敗，稍後播放會再試）" : HC.stabReady(s) ? "" : "（分析中…）") + Math.round((s.stabStr ?? 0.6) * 100) + "%";
   const stabDone = () => { renderTimeline(); const s = cur(); if (s) $("sStabV").textContent = stabLabel(s); refresh(); };
   let editing = false;
   function edit(fn, live) {
@@ -215,7 +219,7 @@
       const w = Math.max(6, HC.outDur(s) * p - 2), c = HC.clip(s.clipId);
       const lab = `${MODE[s.mode]}${s.text ? "・" + s.text : ""} ${HC.outDur(s).toFixed(1)}s`;
       return `<div class="shot ${s.mode === "move" ? "mv" : "st"} ${s.id === sel ? "on" : ""}" style="width:${w}px" data-id="${s.id}" draggable="true" tabindex="0" title="${esc((c ? c.name : "缺少素材") + "  " + lab)}">
-        <span class="k"></span>${i && s.tr && s.tr.type !== "cut" ? `<span class="trk ${s.tr.type === "black" ? "black" : ""}" title="轉場：${HC.trInfo(s.tr.type).name}"></span>` : ""}${s.stab && w > 56 ? `<span class="stb">${HC.stabReady(s) ? "防抖" : "防抖…"}</span>` : ""}<span class="lb">${i + 1}. ${esc(lab)}</span></div>`;
+        <span class="k"></span>${i && s.tr && s.tr.type !== "cut" ? `<span class="trk ${s.tr.type === "black" ? "black" : ""}" title="轉場：${HC.trInfo(s.tr.type).name}"></span>` : ""}${s.stab && w > 56 ? `<span class="stb">${HC.stabFailed(s) ? "防抖失敗" : HC.stabReady(s) ? "防抖" : "防抖…"}</span>` : ""}<span class="lb">${i + 1}. ${esc(lab)}</span></div>`;
     }).join("");
     for (const s of S().shots) {
       const c = HC.clip(s.clipId), el = document.querySelector(`.shot[data-id="${s.id}"]`);
@@ -262,7 +266,7 @@
     const s = S();
     return JSON.stringify({
       app: "housing-cut", version: 1, name: $("projName").value,
-      clips: s.clips.map((c) => ({ id: c.id, name: c.name, time: c.time, dur: c.dur, excluded: c.excluded })),
+      clips: s.clips.map((c) => ({ id: c.id, name: c.name, time: c.time, dur: c.dur, excluded: c.excluded, sceneMark: c.sceneMark || "" })),
       shots: s.shots, title: s.title, ending: s.ending, look: s.look, out: s.out, auto: s.auto,
       music: { name: s.music.name, vol: s.music.vol, off: s.music.off, fade: s.music.fade },
     }, null, 2);
@@ -275,13 +279,14 @@
     const keep = new Map(s.clips.map((c) => [c.name, c]));
     s.clips = o.clips.map((c) => {
       const have = keep.get(c.name);
-      if (have) { have.excluded = c.excluded || []; const old = have.id; for (const sh of o.shots) if (sh.clipId === c.id) sh.clipId = old; return have; }
-      return { id: c.id, name: c.name, time: c.time, dur: c.dur, excluded: c.excluded || [], missing: true };
+      if (have) { have.excluded = c.excluded || []; have.sceneMark = c.sceneMark || ""; const old = have.id; for (const sh of o.shots) if (sh.clipId === c.id) sh.clipId = old; return have; }
+      return { id: c.id, name: c.name, time: c.time, dur: c.dur, excluded: c.excluded || [], sceneMark: c.sceneMark || "", missing: true };
     });
     s.shots = o.shots.map(HC.migrateShot); Object.assign(s.title, o.title); Object.assign(s.out, o.out); Object.assign(s.auto, o.auto);
     if (o.title && o.title.show === false) s.title.template = "none";
     if (o.ending) Object.assign(s.ending, o.ending);
-    if (o.look) { s.look.filter = o.look.filter || "none"; Object.assign(s.look.fx, o.look.fx || {}); }
+    if (o.look) { s.look.filter = o.look.filter || "none"; s.look.filterStr = o.look.filterStr ?? 1; s.look.tintStr = o.look.tintStr ?? 1; Object.assign(s.look.fx, o.look.fx || {}); }
+    if (s.title.pos === "center") s.title.pos = "auto";   // 舊版的「畫面中央」= 現在的「跟模板一樣」
     Object.assign(s.music, { vol: o.music.vol, off: o.music.off, fade: o.music.fade });
     syncForms(); renderBin(); renderTimeline(); select(null);
     const miss = s.clips.filter((c) => c.missing).length;
@@ -299,8 +304,10 @@
     renderTiles();
     $("aLen").value = s.auto.len; $("aRhy").value = Math.round(s.auto.rhythm * 100); $("aSpeed").value = String(s.auto.speed); $("aZoom").value = Math.round(s.auto.zoom * 100);
     $("aTol").value = Math.round(s.auto.tol * 100); $("aHead").value = s.auto.head; $("aCursor").checked = s.auto.cursor;
+    $("aSceneLook").value = Math.round((s.auto.sceneLook ?? 0.5) * 100);
     $("aUI").checked = s.auto.ui; $("aStab").checked = s.auto.stab; $("aStabStr").value = Math.round(s.auto.stabStr * 100); $("aLearn").checked = s.auto.learn; $("aCover").checked = s.auto.cover; $("aLateral").checked = s.auto.lateral; $("aGap").value = s.auto.gap;
     $("mVol").value = Math.round(s.music.vol * 100); $("mOff").value = s.music.off; $("mFade").value = s.music.fade;
+    $("oMode").value = s.out.mode || "frames"; $("oFps").value = String(s.out.fps || 30);
     $("oRes").value = String(s.out.res); $("oRate").value = String(s.out.rate); $("oFi").value = s.out.fi; $("oFo").value = s.out.fo;
     outputs();
   }
@@ -311,10 +318,15 @@
     $("aZoomV").textContent = Math.round(s.auto.zoom * 100) + "%";
     $("aTolV").textContent = s.auto.tol < 0.34 ? "嚴格" : s.auto.tol < 0.67 ? "一般" : "寬鬆";
     $("aStabV").textContent = Math.round(s.auto.stabStr * 100) + "%";
+    $("aSceneV").textContent = sceneLabel(s.auto.sceneLook ?? 0.5);
     $("mVolV").textContent = Math.round(s.music.vol * 100) + "%";
-    const m = R.pickMime();
-    $("oFmt").textContent = m ? `這個瀏覽器會輸出 ${m.includes("mp4") ? "MP4" : "WebM"} 檔。` : "這個瀏覽器不支援錄製影片，請改用電腦版 Chrome 或 Edge。";
+    const m = R.pickMime(), frames = exportMode() === "frames";
+    $("oFmt").textContent = frames ? "逐格輸出會優先用 MP4（H.264），電腦不支援時改用 WebM。" : m ? `這個瀏覽器會輸出 ${m.includes("mp4") ? "MP4" : "WebM"} 檔。` : "這個瀏覽器不支援錄製影片，請改用電腦版 Chrome 或 Edge。";
+    $("oModeHint").textContent = frames ? "一格一格畫好再存，畫面不會掉格；時間依電腦速度而定，通常是影片長度的 1～4 倍。可以切到其他分頁，但會變慢。"
+      : (HC.canFrameExport() ? "" : "這個瀏覽器不支援逐格輸出，只能即時錄製。") + "即時錄製：2 分鐘的影片要錄 2 分鐘，錄製時請讓這個分頁保持在最前面。";
+    $("oFps").disabled = !frames;
   }
+  const sceneLabel = (v) => (v <= 0 ? "關閉（只看拍攝時間）" : v < 0.35 ? "低" : v < 0.7 ? "中" : "高");
   const bindVal = (id, fn, ev = "input") => $(id).addEventListener(ev, (e) => { fn(e.target); outputs(); refresh(); });
 
   function showTab(name) {
@@ -366,8 +378,12 @@
     const cls = (t) => (t.layout === "lowleft" ? "left low" : t.layout === "left" ? "left" : t.layout === "cinema" ? "low" : "");
     $("tTiles").innerHTML = HC.TITLE_TEMPLATES.map((t) => `<button class="tile ${t.id === cur ? "on" : ""}" data-tpl="${t.id}" aria-pressed="${t.id === cur}"><span class="pv"><span class="tt ${cls(t)}">${t.id === "none" ? "" : "FFXIV<i>HOUSING</i>"}</span></span>${esc(t.name)}</button>`).join("");
     const f = S().look.filter;
-    $("fTiles").innerHTML = HC.FILTERS.map((x) => `<button class="tile ${x.id === f ? "on" : ""}" data-filter="${x.id}" aria-pressed="${x.id === f}"><span class="pv">${lookThumb ? `<img alt="" src="${lookThumb}" style="filter:${x.css || "none"}">` : `<span class="a" style="filter:${x.css || "none"}"></span>`}${x.tint ? `<span class="ov" style="opacity:1;background:${x.tint};mix-blend-mode:soft-light"></span>` : ""}</span>${esc(x.name)}</button>`).join("");
+    $("fTiles").innerHTML = HC.FILTERS.map((x) => `<button class="tile ${x.id === f ? "on" : ""}" data-filter="${x.id}" aria-pressed="${x.id === f}"><span class="pv">${lookThumb ? `<img alt="" src="${lookThumb}" style="filter:${HC.filterCss(x.id, S().look.filterStr ?? 1) || "none"}">` : `<span class="a" style="filter:${HC.filterCss(x.id, S().look.filterStr ?? 1) || "none"}"></span>`}${x.tint ? `<span class="ov" style="opacity:1;background:${HC.tintFill(x.id, S().look.tintStr ?? 1)};mix-blend-mode:soft-light"></span>` : ""}</span>${esc(x.name)}</button>`).join("");
     $("fHint").textContent = HC.canFilter ? "" : "這個瀏覽器不支援畫布濾鏡，只會套用色調。建議用 Chrome 或 Edge。";
+    const L = S().look;
+    $("fStr").value = Math.round((L.filterStr ?? 1) * 100); $("fTint").value = Math.round((L.tintStr ?? 1) * 100);
+    $("fStrV").textContent = $("fStr").value + "%"; $("fTintV").textContent = $("fTint").value + "%";
+    $("fTintRow").classList.toggle("hidden", !HC.filterInfo(L.filter).tint);
     renderFx();
   }
   /* ---------- 特效縮圖 ---------- */
@@ -398,8 +414,12 @@
   }
   function snapLook() {   // 用目前預覽畫面當濾鏡縮圖
     try {
-      const c = document.createElement("canvas"); c.width = 320; c.height = 180; c.getContext("2d").drawImage($("view"), 0, 0, 320, 180);
-      lookThumb = c.toDataURL("image/jpeg", 0.75); lookCanvas = S().shots.length ? c : null;
+      const c = document.createElement("canvas"); c.width = 320; c.height = 180;
+      const g = c.getContext("2d", { willReadFrequently: true }); g.drawImage($("view"), 0, 0, 320, 180);
+      // 預覽還沒畫好（全黑）時用示意圖，不要讓縮圖全部變黑
+      const d = g.getImageData(0, 0, 320, 180).data; let sum = 0; for (let i = 0; i < d.length; i += 64) sum += d[i] + d[i + 1] + d[i + 2];
+      if (!S().shots.length || sum / (d.length / 64) < 12) { lookThumb = ""; lookCanvas = null; return; }
+      lookThumb = c.toDataURL("image/jpeg", 0.75); lookCanvas = c;
     } catch (e) { lookThumb = ""; lookCanvas = null; }
   }
   const seekEnd = () => { if (S().shots.length && !R.isPlaying()) { const { total } = HC.timeline(); seek(Math.max(0, total - (S().out.fo || 0) - 1)); } };
@@ -426,7 +446,8 @@
     if (!S().shots.length) return;
     const miss = S().clips.filter((c) => c.missing && S().shots.some((s) => s.clipId === c.id));
     if (miss.length) return toast("還缺素材：" + miss.map((c) => c.name).join("、"), 5000);
-    if (!R.pickMime()) return toast("這個瀏覽器不支援錄製影片，請改用電腦版 Chrome 或 Edge", 5000);
+    const frames = exportMode() === "frames";
+    if (!frames && !R.pickMime()) return toast("這個瀏覽器不支援錄製影片，請改用電腦版 Chrome 或 Edge", 5000);
     await fontsReady();
     const ov = $("overlay");
     if (S().shots.some((s) => s.stab && !HC.stabReady(s))) {
@@ -435,12 +456,13 @@
       await HC.stabWaitAll((p) => { $("pb").style.width = (p * 100).toFixed(0) + "%"; });
       renderTimeline();
     }
-    ov.innerHTML = `<strong>匯出中…</strong><div class="pbar"><i id="pb"></i></div><span id="pt" class="muted">0%</span><span class="muted">請讓這個分頁保持在最前面</span><button class="btn" id="cancelEx">取消</button>`;
+    ov.innerHTML = `<strong>${frames ? "逐格輸出中…" : "匯出中…"}</strong><div class="pbar"><i id="pb"></i></div><span id="pt" class="muted">0%</span><span class="muted">${frames ? "可以切到其他分頁，但會變慢" : "請讓這個分頁保持在最前面"}</span><button class="btn" id="cancelEx">取消</button>`;
     ov.classList.remove("hidden");
     let cancelled = false;
     $("cancelEx").onclick = () => { cancelled = true; R.cancelExport && R.cancelExport(); };
+    const prog = (p, eta) => { $("pb").style.width = (p * 100).toFixed(1) + "%"; $("pt").textContent = Math.round(p * 100) + "%" + (eta > 3 && p > 0.02 ? `・還要約 ${eta >= 90 ? Math.round(eta / 60) + " 分鐘" : Math.round(eta) + " 秒"}` : ""); };
     try {
-      const { blob, ext } = await R.exportVideo((p) => { $("pb").style.width = (p * 100).toFixed(1) + "%"; $("pt").textContent = Math.round(p * 100) + "%"; });
+      const { blob, ext } = frames ? await R.exportFrames(prog, () => cancelled) : await R.exportVideo(prog);
       ov.classList.add("hidden");
       if (cancelled) return toast("已取消匯出");
       if (S().auto.learn && HC.lastAuto) { const r = HC.learnFromEdits(); if (r.ok) { renderLearn(); setTimeout(() => toast("已從這次的修改學習剪輯風格"), 3000); } }
@@ -450,8 +472,14 @@
       ov.classList.remove("hidden");
       $("dlEx").onclick = () => saveFile(name, blob);
       $("closeEx").onclick = () => { ov.classList.add("hidden"); seek(0); };
-    } catch (e) { ov.classList.add("hidden"); toast("匯出失敗：" + e.message, 5000); }
+    } catch (e) {
+      ov.classList.add("hidden");
+      if (e && e.cancelled) return toast("已取消匯出");
+      toast("匯出失敗：" + e.message, 5000);
+    }
   }
+  // 逐格輸出是預設；瀏覽器不支援時自動改用即時錄製
+  const exportMode = () => (S().out.mode !== "realtime" && HC.canFrameExport() ? "frames" : "realtime");
 
   /* ---------- 事件 ---------- */
   function bind() {
@@ -477,13 +505,23 @@
     $("projIn").addEventListener("change", async (e) => { const f = e.target.files[0]; e.target.value = ""; if (!f) return; try { loadProject(JSON.parse(await f.text())); } catch (err) { toast("專案檔讀取失敗"); } });
     $("exportBtn").onclick = doExport; $("exportBtn2").onclick = doExport;
 
-    $("playBtn").onclick = () => { if (R.exporting) return; if (R.isPlaying()) R.stop(); else { const { total } = HC.timeline(); R.play(R.T >= total - 0.05 ? 0 : R.T); } };
+    $("playBtn").onclick = () => { if (R.exporting) return; if (R.isPlaying()) R.stop(); else { HC.stabQueue(stabDone); const { total } = HC.timeline(); R.play(R.T >= total - 0.05 ? 0 : R.T); } };
     $("scrub").addEventListener("input", (e) => { const T = e.target.value / 10; movePlayhead(T); seek(T); });
 
     document.querySelectorAll(".tabs button").forEach((b) => b.onclick = () => showTab(b.dataset.tab));
 
-    $("binList").addEventListener("click", (e) => { const el = e.target.closest(".clip"); if (el) openSource(HC.clip(el.dataset.id)); });
-    $("binList").addEventListener("keydown", (e) => { if (e.key === "Enter") { const el = e.target.closest(".clip"); if (el) openSource(HC.clip(el.dataset.id)); } });
+    $("binList").addEventListener("click", (e) => {
+      const sp = e.target.closest("[data-split],[data-join]");
+      if (sp) {   // 手動分場景／併回：只影響之後的自動剪輯
+        HC.commit();
+        const c = HC.clip(sp.dataset.split || sp.dataset.join);
+        c.sceneMark = sp.dataset.split ? "start" : "join";
+        renderBin(); toast("場景已調整，按「自動剪輯」套用到時間軸");
+        return;
+      }
+      const el = e.target.closest(".clip"); if (el) openSource(HC.clip(el.dataset.id));
+    });
+    $("binList").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.target.closest("button")) { const el = e.target.closest(".clip"); if (el) openSource(HC.clip(el.dataset.id)); } });
 
     // 原始素材
     const v = $("srcVid");
@@ -594,7 +632,9 @@
       if (Date.now() - resetArm > 4000) { resetArm = Date.now(); return toast("再按一次「全部重設」確認清除學習資料"); }
       HC.resetProfile(); renderLearn(); toast("學習資料已清除");
     };
-    bindVal("aGap", (t) => A().gap = +t.value || 0, "change");
+    bindVal("aGap", (t) => { A().gap = Math.max(0, +t.value || 0); renderBin(); }, "change");
+    bindVal("aSceneLook", (t) => { A().sceneLook = t.value / 100; renderBin(); }, "change");
+    $("aSceneLook").addEventListener("input", (e) => { $("aSceneV").textContent = sceneLabel(e.target.value / 100); });
 
     // 標題
     const Ti = () => S().title;
@@ -620,6 +660,7 @@
     bindVal("mVol", (t) => S().music.vol = t.value / 100); bindVal("mOff", (t) => S().music.off = Math.max(0, +t.value || 0), "change"); bindVal("mFade", (t) => S().music.fade = Math.max(0, +t.value || 0), "change");
 
     // 匯出設定
+    bindVal("oMode", (t) => S().out.mode = t.value, "change"); bindVal("oFps", (t) => S().out.fps = +t.value, "change");
     bindVal("oRes", (t) => S().out.res = +t.value, "change"); bindVal("oRate", (t) => S().out.rate = +t.value, "change");
     bindVal("oFi", (t) => S().out.fi = Math.max(0, +t.value || 0), "change"); bindVal("oFo", (t) => S().out.fo = Math.max(0, +t.value || 0), "change");
 
@@ -628,7 +669,7 @@
     $("trDur").addEventListener("input", () => { $("trDurV").textContent = (+$("trDur").value).toFixed(1) + " 秒"; });
     $("trApply").onclick = () => { const s = cur(), i = S().shots.indexOf(s); applyTr(s && i > 0 ? [s] : []); };
     $("trAll").onclick = () => applyTr(S().shots.slice(1));
-    $("trScenes").onclick = () => applyTr(S().shots.filter((s, i) => i && HC.boundaryKind(S().shots[i - 1], s, S().auto) === "gap"));
+    $("trScenes").onclick = () => applyTr(S().shots.filter((s, i) => i && HC.boundaryKind(S().shots[i - 1], s) === "gap"));
     // 開頭模板
     $("tTiles").addEventListener("click", (e) => { const b = e.target.closest("[data-tpl]"); if (!b) return; HC.commit(); S().title.template = b.dataset.tpl; renderTiles(); if (S().shots.length) { R.stop(); R.play(0); setTimeout(() => R.isPlaying() && R.T > S().title.dur + 1 && R.stop(), (S().title.dur + 1.5) * 1000); } });
     // 濾鏡與特效
@@ -651,6 +692,15 @@
       if (b) { b.classList.add("on"); b.setAttribute("aria-pressed", "true"); let bd = b.querySelector(".badge"); if (!bd) { bd = document.createElement("span"); bd.className = "badge"; b.querySelector(".pv").appendChild(bd); } bd.textContent = Math.round(v * 100) + "%"; }
       drawFxThumb(fxSel, 2.5); refresh();
     });
+    // 濾鏡強度、色調濃度：拖的時候即時預覽，放開才記一筆復原
+    for (const [id, key] of [["fStr", "filterStr"], ["fTint", "tintStr"]]) {
+      let armed = false;
+      $(id).addEventListener("input", (e) => {
+        if (!armed) { HC.commit(); armed = true; }
+        S().look[key] = e.target.value / 100; $(id + "V").textContent = e.target.value + "%"; refresh();
+      });
+      $(id).addEventListener("change", () => { armed = false; renderTiles(); });
+    }
     document.querySelector('[data-tab="look"]').addEventListener("click", () => { snapLook(); renderTiles(); });
     // 自動剪輯：順序、轉場方式
     bindVal("aOrder", (t) => A().order = t.value, "change");

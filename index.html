@@ -147,6 +147,8 @@
       <label class="check"><input id="aCover" type="checkbox" checked> 每支素材至少用一個鏡頭</label>
       <label class="check"><input id="aLateral" type="checkbox" checked> 優先挑橫向移動的運鏡</label>
       <label>拍攝時間相隔超過幾分鐘，就算不同場景<input id="aGap" type="number" value="8" min="0" step="1"></label>
+      <label>畫面換場景的判斷靈敏度 <output id="aSceneV"></output><input id="aSceneLook" type="range" min="0" max="100" step="5" value="50"></label>
+      <p class="hint">例如庭園 → 室內。分錯了可以在左邊素材區手動「分場景」或「併回」。</p>
       <label>鏡頭順序
         <select id="aOrder"><option value="learn">依學到的習慣</option><option value="time">照拍攝時間</option><option value="rhythm">靜止、運鏡交錯</option></select>
       </label>
@@ -187,7 +189,7 @@
         <label>強調色<input id="tAccent" type="color" value="#e9c46a"></label>
       </div>
       <label>位置（部分模板有固定位置）
-        <select id="tPos"><option value="center">畫面中央</option><option value="lowleft">左下角</option><option value="top">上方</option></select>
+        <select id="tPos"><option value="auto">跟模板一樣</option><option value="top">上方</option><option value="middle">中間</option><option value="bottom">下方</option><option value="lowleft">左下角（靠左）</option></select>
       </label>
       <label class="check"><input id="tLine" type="checkbox" checked> 標題下加細線</label>
       <h3 class="sec">片尾</h3>
@@ -200,6 +202,8 @@
     <div class="pane" id="pane-look">
       <h3 class="sec">濾鏡（整支影片）</h3>
       <div class="tiles" id="fTiles"></div>
+      <label>濾鏡強度 <output id="fStrV"></output><input id="fStr" type="range" min="0" max="200" step="5" value="100"></label>
+      <label id="fTintRow">色調濃度 <output id="fTintV"></output><input id="fTint" type="range" min="0" max="200" step="5" value="100"></label>
       <p class="hint" id="fHint"></p>
       <h3 class="sec">特效</h3>
       <p class="hint">點一下開啟或關閉，可以同時開好幾種。滑鼠移到縮圖上會播放效果。</p>
@@ -236,12 +240,14 @@
     </div>
 
     <div class="pane" id="pane-out">
+      <label>匯出方式<select id="oMode"><option value="frames">逐格輸出（不掉格，較慢）</option><option value="realtime">即時錄製（較快，電腦忙時可能掉格）</option></select></label>
+      <label>每秒格數<select id="oFps"><option value="30">30 fps</option><option value="60">60 fps</option></select></label>
       <label>解析度<select id="oRes"><option value="1080">1920×1080</option><option value="720">1280×720</option></select></label>
       <label>畫質<select id="oRate"><option value="16">高（約 16 Mbps）</option><option value="10" selected>標準（約 10 Mbps）</option><option value="5">小檔（約 5 Mbps）</option></select></label>
       <label>片頭淡入（秒）<input id="oFi" type="number" value="1.5" step="0.5" min="0"></label>
       <label>片尾淡出（秒）<input id="oFo" type="number" value="2.5" step="0.5" min="0"></label>
       <p class="hint" id="oFmt"></p>
-      <p class="hint">匯出是即時錄製：2 分鐘的影片要錄 2 分鐘。錄製時請讓這個分頁保持在最前面。</p>
+      <p class="hint" id="oModeHint"></p>
       <button class="btn accent wide" id="exportBtn2" disabled>匯出影片</button>
       <h3 class="sec">HyperFrames 專案（最高畫質）</h3>
       <p class="hint">匯出成 HyperFrames 專案，在你的電腦上用 <code>npx hyperframes render</code> 逐格渲染：不會掉格、畫質最好，也能在 HyperFrames Studio 繼續編輯。需要安裝 Node.js 22 以上和 FFmpeg，步驟寫在專案裡的 README.md。</p>
@@ -275,6 +281,10 @@
 <script src="js/hyperframes.js"></script>
 <script src="js/auto.js"></script>
 <script src="js/render.js"></script>
+<script src="js/vendor/mp4-muxer.min.js"></script>
+<script src="js/vendor/webm-muxer.min.js"></script>
+<script src="js/mp4index.js"></script>
+<script src="js/export.js"></script>
 <script src="js/ui.js"></script>
 </body>
 </html>

@@ -59,7 +59,7 @@
     const textForFonts = [S.title.main, S.title.sub, S.title.info, S.ending.main, S.ending.sub, ...shots.map((s) => s.text || "")].join("");
 
     const clipsHtml = shots.map((s, i) => {
-      const f = HC.filterInfo(s.filter || S.look.filter).css;
+      const f = HC.filterCss(s.filter || S.look.filter, S.look.filterStr ?? 1);
       return `  <div class="frame" id="f${i}" style="z-index:${i + 1}"><div class="stab" id="s${i}"><div class="kb" id="k${i}">
     <video id="v${i}" class="clip" data-start="${r3(starts[i])}" data-duration="${r3(HC.outDur(s))}" data-track-index="${i % 2}" data-media-start="${r3(s.start)}" data-playback-rate="${s.speed}" src="${fileOf.get(s.clipId)}" muted playsinline${f ? ` style="filter:${f}"` : ""}></video>
   </div></div></div>`;

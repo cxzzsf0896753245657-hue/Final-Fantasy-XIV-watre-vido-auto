@@ -116,6 +116,7 @@
       if (L.len) opt.len = Math.round(HC.clamp(L.len, 30, 300) / 5) * 5;
     }
     HC.sortClips();
+    HC.computeScenes();
     const clips = S.clips.filter((c) => c.ana);
     const order = new Map(clips.map((c, i) => [c.id, i]));
     let cands = [];
@@ -189,13 +190,53 @@
     }
   };
 
+  /* ---------- 場景 ----------
+     依拍攝時間排好素材，以下任一情況就開始新場景：
+     1. 和上一支的拍攝時間相隔超過設定的分鐘數
+     2. 畫面明顯換了（例如庭園 → 室內）：比較「前 3 支」和「後 3 支」素材的平均色彩，差異是附近最大、且超過門檻
+        （只比單一支會被夜景、特寫誤判，所以看前後一小段的平均）；每個場景至少 3 支素材
+     3. 你在素材區手動標記的「從這裡開始新場景」／「併回上一個場景」優先
+     結果存在每支素材的 c.scene（場景編號，從 0 開始） */
+  HC.computeScenes = () => {
+    const S = HC.state, opt = S.auto;
+    const cs = S.clips.slice().sort((x, y) => (x.time - y.time) || x.name.localeCompare(y.name, undefined, { numeric: true }));
+    const n = cs.length, brk = new Array(n).fill(false), why = new Array(n).fill("");
+    for (let i = 1; i < n; i++) if (opt.gap > 0 && Math.abs(cs[i].time - cs[i - 1].time) > opt.gap * 60000) { brk[i] = true; why[i] = "time"; }
+    if (opt.sceneLook > 0 && n >= 6) {
+      const K = 3, thr = 0.4 - 0.25 * opt.sceneLook;   // 靈敏度 0～1 → 門檻 0.4～0.15
+      const mean = (a, b) => {
+        const xs = cs.slice(Math.max(0, a), Math.min(n, b)).map((c) => c.ana && c.ana.sig).filter(Boolean);
+        if (!xs.length) return null;
+        return xs[0].map((_, k) => xs.reduce((s, x) => s + x[k], 0) / xs.length);
+      };
+      const sc = new Array(n).fill(0);
+      for (let i = 1; i < n; i++) { const a = mean(i - K, i), b = mean(i, i + K); sc[i] = a && b ? HC.sigDiff(a, b) : 0; }
+      const cands = [];
+      for (let i = 1; i < n; i++) if (sc[i] > thr && sc[i] >= Math.max(sc[i - 1] || 0, sc[i + 1] || 0, sc[i - 2] || 0, sc[i + 2] || 0)) cands.push(i);
+      cands.sort((a, b) => sc[b] - sc[a]);
+      for (const i of cands) {
+        if (brk[i]) continue;
+        let p = i - 1; while (p > 0 && !brk[p]) p--;
+        let q = i + 1; while (q < n && !brk[q]) q++;
+        if (i - p >= 3 && q - i >= 3) { brk[i] = true; why[i] = "look"; }
+      }
+    }
+    for (let i = 0; i < n; i++) {
+      if (cs[i].sceneMark === "start" && i) { brk[i] = true; why[i] = "mark"; }
+      if (cs[i].sceneMark === "join") { brk[i] = false; why[i] = ""; }
+    }
+    let k = 0;
+    cs.forEach((c, i) => { if (i && brk[i]) k++; c.scene = k; c.sceneWhy = brk[i] ? why[i] : ""; });
+    return k + 1;
+  };
+  const sceneOf = (clipId) => { const c = HC.clip(clipId); return c && c.scene != null ? c.scene : 0; };
+
   /* ---------- 順序 ---------- */
-  const scenes = (shots, opt) => {
+  const scenes = (shots) => {
     const out = [];
     for (const s of shots) {
-      const last = out[out.length - 1], c = HC.clip(s.clipId);
-      const lc = last && HC.clip(last[last.length - 1].clipId);
-      if (!last || (opt.gap > 0 && lc && Math.abs(c.time - lc.time) > opt.gap * 60000)) out.push([s]); else last.push(s);
+      const last = out[out.length - 1];
+      if (!last || sceneOf(s.clipId) !== sceneOf(last[last.length - 1].clipId)) out.push([s]); else last.push(s);
     }
     return out;
   };
@@ -205,7 +246,7 @@
     const seq = mode === "seq" ? L.order.seq : { SS: 0.2, SM: 0.8, MS: 0.8, MM: 0.2 };
     const type = (s) => (s.mode === "move" ? "M" : "S");
     const out = [];
-    scenes(shots, opt).forEach((sc, k) => {
+    scenes(shots).forEach((sc, k) => {
       const rest = sc.slice();
       let first = rest[0];
       if (k === 0 && mode === "seq") {   // 開場鏡頭的類型：學你習慣用靜止還是運鏡開場
@@ -225,10 +266,9 @@
 
   /* ---------- 轉場 ---------- */
   // 每個接點的情境：同一支素材、換素材、換場景（拍攝時間相隔很久）
-  HC.boundaryKind = (prev, cur, opt) => {
+  HC.boundaryKind = (prev, cur) => {
     if (prev.clipId === cur.clipId) return "same";
-    const p = HC.clip(prev.clipId), c = HC.clip(cur.clipId);
-    return opt.gap > 0 && p && c && Math.abs(c.time - p.time) > opt.gap * 60000 ? "gap" : "change";
+    return sceneOf(prev.clipId) !== sceneOf(cur.clipId) ? "gap" : "change";
   };
   HC.assignTransitions = (shots, opt, L) => {
     const mix = ["fade", "blur", "circle", "wipeR", "zoom", "slow"];
@@ -246,7 +286,7 @@
     };
     shots.forEach((s, i) => {
       if (!i) { s.tr = { type: "cut", dur: 0 }; return; }
-      const kind = HC.boundaryKind(shots[i - 1], s, opt);
+      const kind = HC.boundaryKind(shots[i - 1], s);
       let type;
       if (opt.trMode === "all") type = opt.trType;
       else if (opt.trMode === "mix") type = kind === "same" ? "cut" : kind === "gap" ? "black" : mix[mi++ % mix.length];

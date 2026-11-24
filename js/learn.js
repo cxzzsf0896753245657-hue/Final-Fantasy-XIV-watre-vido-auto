@@ -124,7 +124,7 @@
   function trOf(shots) {
     const tr = { same: {}, change: {}, gap: {} }, durs = {};
     for (let i = 1; i < shots.length; i++) {
-      const t = (shots[i].tr && shots[i].tr.type) || "cut", kind = HC.boundaryKind(shots[i - 1], shots[i], HC.state.auto);
+      const t = (shots[i].tr && shots[i].tr.type) || "cut", kind = HC.boundaryKind(shots[i - 1], shots[i]);
       tr[kind][t] = (tr[kind][t] || 0) + 1;
       if (t !== "cut") (durs[t] = durs[t] || []).push(shots[i].tr.dur);
     }

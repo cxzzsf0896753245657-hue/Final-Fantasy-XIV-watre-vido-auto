@@ -4,6 +4,7 @@
    - dx / dy：鏡頭往哪個方向移動（用來找出橫向運鏡）
    - luma：亮度（太暗的黑畫面會被避開）
    - cursor：每 0.3 秒用原尺寸畫面找一次白色滑鼠游標
+   - sig：整支素材的色彩特徵（色相＋亮度分布），用來判斷兩支素材是不是同一個場景（例如庭園 vs 室內）
    - ui：遊戲介面（快捷列、聊天框、小地圖…）。鏡頭在動的時候，畫面上還是固定不動、有紋理的區塊就是介面
 */
 {
@@ -27,7 +28,8 @@
     const cx = cc.getContext("2d", { willReadFrequently: true });
 
     const A = { t: [], m: [], dx: [], dy: [], luma: [], curT: [], blk: [], zm: [] };
-    let prev = null, prevT = -1, lastCur = -1;
+    let prev = null, prevT = -1, lastCur = -1, lastSig = -1;
+    const sigAcc = new Float64Array(HC.SIG_BINS);
 
     const take = (t) => {
       sx.drawImage(v, 0, 0, SW, SH);
@@ -49,6 +51,7 @@
         }
       }
       prev = g; prevT = t;
+      if (!opts.ref && t - lastSig >= 0.5) { lastSig = t; HC.colorSig(d, sigAcc); }
       if (!opts.ref && t - lastCur >= 0.3) {   // 參考影片不需要找游標
         lastCur = t;
         cx.drawImage(v, 0, 0, CW, CH);
@@ -59,14 +62,44 @@
 
     let ok = false;
     if ("requestVideoFrameCallback" in v) ok = await viaFrames(v, take, clip.dur);
-    if (!ok) { A.t.length = A.m.length = A.dx.length = A.dy.length = A.luma.length = A.curT.length = A.blk.length = A.zm.length = 0; prev = null; lastCur = -1; await viaSeek(v, take, clip.dur); }
+    if (!ok) { sigAcc.fill(0); lastSig = -1; A.t.length = A.m.length = A.dx.length = A.dy.length = A.luma.length = A.curT.length = A.blk.length = A.zm.length = 0; prev = null; lastCur = -1; await viaSeek(v, take, clip.dur); }
 
     A.cursor = ranges(A.curT, 0.6, 0.45);
+    if (!opts.ref) A.sig = HC.normSig(sigAcc);
     HC.findUI(A);
     delete A.blk; delete A.curT;   // 只是中間資料，不必留著佔記憶體
     clip.ana = A;
     v.removeAttribute("src"); v.load();
     return A;
+  };
+
+  /* ---------- 色彩特徵 ----------
+     12 格色相（依飽和度加權）＋ 8 格亮度。兩個場景的分布差很多（庭園偏綠、天空藍；室內偏暖、偏暗）就算不同場景 */
+  const HUE = 12, LUM = 8;
+  HC.SIG_BINS = HUE + LUM;
+  HC.colorSig = (d, acc) => {
+    for (let j = 0; j < d.length; j += 16) {   // 每 4 個像素取 1 個就夠了
+      const r = d[j], g = d[j + 1], b = d[j + 2], mx = Math.max(r, g, b), mn = Math.min(r, g, b), c = mx - mn;
+      acc[HUE + Math.min(LUM - 1, (mx * LUM) >> 8)] += 1;
+      if (c < 18 || mx < 30) continue;   // 太灰、太暗的像素沒有可靠的色相
+      let h = mx === r ? ((g - b) / c) % 6 : mx === g ? (b - r) / c + 2 : (r - g) / c + 4;
+      if (h < 0) h += 6;
+      acc[Math.min(HUE - 1, Math.floor(h * HUE / 6))] += c / 255;
+    }
+  };
+  HC.normSig = (acc) => {
+    let a = 0, b = 0;
+    for (let i = 0; i < HUE; i++) a += acc[i];
+    for (let i = HUE; i < HUE + LUM; i++) b += acc[i];
+    return Array.from(acc, (v, i) => +(i < HUE ? (a ? v / a : 0) : (b ? v / b : 0)).toFixed(4));
+  };
+  /* 兩支素材畫面差多少：0 = 一模一樣，1 = 完全不同（色相和亮度各佔一半，用分布重疊量算） */
+  HC.sigDiff = (x, y) => {
+    if (!x || !y) return 0;
+    let h = 0, l = 0;
+    for (let i = 0; i < HUE; i++) h += Math.min(x[i], y[i]);
+    for (let i = HUE; i < HUE + LUM; i++) l += Math.min(x[i], y[i]);
+    return 1 - (h + l) / 2;
   };
 
   /* 快速：4 倍速播放並在每個解碼出的畫面取樣 */

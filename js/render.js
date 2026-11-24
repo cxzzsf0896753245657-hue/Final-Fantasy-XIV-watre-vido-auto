@@ -24,9 +24,11 @@
     }
     return v;
   }
-  const mt = (v) => (v._mt != null && !v.seeking ? v._mt : v.currentTime);
+  // 畫面的素材時間（逐格匯出時 v 可能是解碼出來的 VideoFrame）
+  const mt = (v) => (v.timestamp != null && v.currentTime == null ? v.timestamp / 1e6 : v._mt != null && !v.seeking ? v._mt : v.currentTime);
 
   R.init = (cv) => { canvas = cv; ctx = cv.getContext("2d"); clear(); };
+  R.canvas = () => canvas;
   function clear() { ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height); }
   function buffers() {
     for (const k of ["A", "B"]) {
@@ -51,14 +53,14 @@
       case "panD": z = 1 + k; fy = e; break;
       case "none": z = 1 + k; break;
     }
-    const vw = v.videoWidth || 1920, vh = v.videoHeight || 1080;
+    const vw = v.videoWidth || v.displayWidth || 1920, vh = v.videoHeight || v.displayHeight || 1080;
     const st = s.stab ? HC.stabOffset(s, mt(v)) : null;   // 防抖：稍微放大，再把畫面往晃動的反方向挪
     if (st) z *= HC.stabCrop(s);
     const sc = Math.max(W / vw, H / vh) * z, sw = W / sc, sh = H / sc;
     let sx = (vw - sw) * fx, sy = (vh - sh) * fy;
     if (st) { sx = HC.clamp(sx + st[0] * vw, 0, vw - sw); sy = HC.clamp(sy + st[1] * vh, 0, vh - sh); }
-    const f = HC.filterInfo(s.filter || HC.state.look.filter);
-    if (HC.canFilter) c.filter = f.css || "none";
+    const L = HC.state.look;
+    if (HC.canFilter) c.filter = HC.filterCss(s.filter || L.filter, L.filterStr ?? 1) || "none";
     c.drawImage(v, sx, sy, sw, sh, 0, 0, W, H);
     if (HC.canFilter) c.filter = "none";
   }
@@ -86,6 +88,7 @@
     HC.drawOverlay(ctx, W, H, R.overlayInfo(T, still), canvas);
     lastDraw = performance.now();
   }
+  R.compose = compose;   // 逐格匯出（export.js）用
 
   /* ---------- 載入某個鏡頭到某個 video ---------- */
   async function load(v, s, off) {

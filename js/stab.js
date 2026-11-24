@@ -6,7 +6,10 @@
 */
 {
   const HC = window.HC;
-  const cache = new Map();          // key -> {t, x, y}（原始素材時間、以畫面寬高為單位的累積位移）
+  const cache = new Map();          // key -> {t, x, y}（原始素材時間、以畫面寬高為單位的累積位移）；失敗 = null
+  const fails = new Map();          // key -> {n: 連續失敗次數, at: 最後失敗時間}
+  const MAX_CACHE = 300;            // 最多記住幾段的量測結果，超過就丟掉時間軸上已經沒用到的
+  const RETRY = 3, RETRY_AFTER = 30000;   // 失敗立刻重試 3 次；還是失敗，30 秒後再按播放或匯出會重新試
   const jobs = [];
   let running = false;
   const FW = 640, FH = 360;       // 量測用的畫面大小（越大越準、越慢）
@@ -14,6 +17,13 @@
 
   HC.stabKey = (s) => `${s.clipId}|${s.start.toFixed(2)}|${s.dur.toFixed(2)}`;
   HC.stabReady = (s) => cache.has(HC.stabKey(s));
+  HC.stabFailed = (s) => cache.has(HC.stabKey(s)) && cache.get(HC.stabKey(s)) === null;
+  function remember(k, val) {
+    cache.delete(k); cache.set(k, val);
+    if (cache.size <= MAX_CACHE) return;
+    const used = new Set(HC.state.shots.filter((s) => s.stab).map(HC.stabKey));
+    for (const key of cache.keys()) { if (cache.size <= MAX_CACHE) break; if (!used.has(key)) cache.delete(key); }
+  }
   HC.stabPending = () => jobs.length + (running ? 1 : 0);
 
   /* 需要防抖但還沒分析的鏡頭排進佇列 */
@@ -21,16 +31,22 @@
     for (const s of HC.state.shots) {
       if (!s.stab) continue;
       const k = HC.stabKey(s), c = HC.clip(s.clipId);
-      if (!c || c.missing || cache.has(k) || jobs.some((j) => j.k === k)) continue;
+      if (!c || c.missing || jobs.some((j) => j.k === k)) continue;
+      if (cache.has(k)) {   // 之前失敗過：隔一段時間再試
+        const f = fails.get(k);
+        if (cache.get(k) !== null || !f || Date.now() - f.at < RETRY_AFTER) continue;
+        cache.delete(k); f.n = 0;
+      }
       jobs.push({ k, clip: c, a: s.start, b: s.start + s.dur });
     }
     pump(onDone);
   };
   HC.stabWaitAll = (onProgress) => new Promise((res) => {
     HC.stabQueue();
-    const total = Math.max(1, HC.stabPending());
+    let total = Math.max(1, HC.stabPending());
     const tick = () => {
       const left = HC.stabPending();
+      total = Math.max(total, left);
       onProgress && onProgress(1 - left / total);
       if (!left) res(); else setTimeout(tick, 300);
     };
@@ -44,7 +60,16 @@
     running = true;
     while (jobs.length) {
       const j = jobs.shift();
-      try { cache.set(j.k, await measure(j.clip, j.a, j.b)); } catch (e) { cache.set(j.k, null); }
+      try {
+        const r = await measure(j.clip, j.a, j.b);
+        if (r.t.length < 4) throw new Error("too few frames");
+        remember(j.k, r); fails.delete(j.k);
+      } catch (e) {
+        const f = fails.get(j.k) || { n: 0, at: 0 };
+        f.n++; f.at = Date.now(); fails.set(j.k, f);
+        if (f.n < RETRY && j.clip.url && !j.clip.missing) jobs.push(j);   // 排到最後再試一次
+        else remember(j.k, null);   // 先當作不防抖，免得播放、匯出一直等
+      }
       onAnyDone && onAnyDone();
     }
     running = false;
