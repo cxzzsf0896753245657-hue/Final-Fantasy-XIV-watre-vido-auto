@@ -13,6 +13,7 @@ window.HC = window.HC || {};
     shots: [],
     title: { template: "classic", main: "FFXIV HOUSING", sub: "庭園 ・ Garden", info: "", font: "Noto Serif TC", size: 84, color: "#ffffff", accent: "#e9c46a", pos: "auto", line: true, dur: 5.5 },
     ending: { template: "none", main: "Thank you for watching", sub: "", info: "", dur: 4 },
+    wm: { on: false, kind: "text", text: "", img: "", corner: "br", size: 0.1, opacity: 0.75 },   // 浮水印
     look: { filter: "none", filterStr: 1, tintStr: 1, fx: { vignette: 0, glow: 0, bokeh: 0, petals: 0, grain: 0, letterbox: 0 } },
     music: { name: "", url: "", vol: 0.8, off: 0, fade: 3, lib: "" },
     amb: [],   // 環境音效（最多 3 層，整支影片循環播放）：{ key, name, url, vol, lib }
@@ -30,13 +31,81 @@ window.HC = window.HC || {};
     return m + ":" + (s - m * 60).toFixed(1).padStart(4, "0");
   };
   HC.clip = (id) => HC.state.clips.find((c) => c.id === id);
-  HC.outDur = (s) => s.dur / s.speed;
-  /* 成品畫面大小：橫式 16:9 或直式 9:16（Shorts／Reels） */
-  HC.outSize = (res) => {
-    const h = (res || HC.state.out.res) === 720 ? 720 : 1080, v = HC.state.out.aspect === "9:16";
-    return v ? { W: h, H: Math.round(h * 16 / 9) } : { W: Math.round(h * 16 / 9), H: h };
+  /* 鏡頭時間 ↔ 素材時間
+     - 速度曲線（s.ramp）：ease = 頭尾慢中間快、in = 慢慢加速、out = 慢慢減速；總長度不變
+     - 定格（s.freeze 秒）：素材播完後停在最後一格 */
+  const RAMP_A = 0.6;
+  const RAMPS = {
+    ease: [(u) => u - RAMP_A * Math.sin(2 * Math.PI * u) / (2 * Math.PI), (u) => 1 - RAMP_A * Math.cos(2 * Math.PI * u)],
+    in: [(u) => u - RAMP_A * Math.sin(Math.PI * u) / Math.PI, (u) => 1 - RAMP_A * Math.cos(Math.PI * u)],
+    out: [(u) => u + RAMP_A * Math.sin(Math.PI * u) / Math.PI, (u) => 1 + RAMP_A * Math.cos(Math.PI * u)],
   };
-  HC.vertical = () => HC.state.out.aspect === "9:16";
+  const lin = [(u) => u, () => 1];
+  const rampOf = (s) => (s.mode === "move" && RAMPS[s.ramp]) || lin;
+  HC.moveDur = (s) => s.dur / s.speed;                       // 會動的部分
+  HC.outDur = (s) => s.dur / s.speed + (s.freeze || 0);      // 加上定格
+  HC.srcTime = (s, lt) => s.start + s.dur * rampOf(s)[0](HC.clamp(lt / HC.moveDur(s), 0, 1));
+  HC.rateAt = (s, lt) => s.speed * rampOf(s)[1](HC.clamp(lt / HC.moveDur(s), 0, 1));
+  HC.ltOfSrc = (s, src) => {   // 反過來：素材時間 → 鏡頭時間（二分搜尋，曲線是單調遞增的）
+    const md = HC.moveDur(s), y = (src - s.start) / s.dur, F = rampOf(s)[0];
+    if (F === lin[0]) return y * md;
+    if (y <= 0) return y * md; if (y >= 1) return md + (y - 1) * md;
+    let lo = 0, hi = 1;
+    for (let k = 0; k < 24; k++) { const m = (lo + hi) / 2; if (F(m) < y) lo = m; else hi = m; }
+    return (lo + hi) / 2 * md;
+  };
+  /* 自訂路徑：起點畫框 a → 終點畫框 b（x, y = 目標點 0～1，z = 放大倍率 ≥ 1） */
+  HC.defaultPath = (s) => { const [x, y] = HC.focusOf(s); return { a: { x: 0.5, y: 0.5, z: 1 }, b: { x, y, z: 1 + Math.max(0.12, s.zoom || 0.15) } }; };
+  HC.pathAt = (s, e) => {
+    const p = s.kf || HC.defaultPath(s), m = (k) => p.a[k] + (p.b[k] - p.a[k]) * e;
+    return { x: HC.clamp(m("x"), 0, 1), y: HC.clamp(m("y"), 0, 1), z: Math.max(1, m("z")) };
+  };
+  /* 每個鏡頭的調色：亮度、對比、飽和度（-1～1）＋色溫（-1 冷 ～ 1 暖） */
+  HC.adjCss = (s) => {
+    const a = s.adj; if (!a) return "";
+    const f = [];
+    if (a.b) f.push(`brightness(${(1 + a.b * 0.45).toFixed(3)})`);
+    if (a.c) f.push(`contrast(${(1 + a.c * 0.45).toFixed(3)})`);
+    if (a.s) f.push(`saturate(${(1 + a.s * 0.7).toFixed(3)})`);
+    return f.join(" ");
+  };
+  HC.tempFill = (s) => {
+    const t = s.adj && s.adj.t; if (!t) return "";
+    return t > 0 ? `rgba(255,150,60,${(t * 0.45).toFixed(3)})` : `rgba(70,140,255,${(-t * 0.45).toFixed(3)})`;
+  };
+  /* 這一格要從素材裡裁哪一塊（素材像素座標）。st = 防抖位移（可省略） */
+  const easeIO = (p) => 0.5 - 0.5 * Math.cos(Math.PI * HC.clamp(p, 0, 1));
+  HC.cropAt = (s, lt, vw, vh, W, H, st, crop = 1) => {
+    const od = HC.outDur(s), e = easeIO(Math.min(1, lt / od)), k = s.zoom || 0;
+    let z = 1, [fx, fy] = HC.focusOf(s);
+    switch (s.mode) {
+      case "path": { const p = HC.pathAt(s, e); z = p.z; fx = p.x; fy = p.y; break; }
+      case "in": z = 1 + k * e; break;
+      case "out": z = 1 + k - k * e; break;
+      case "panR": z = 1 + k; fx = e; break;
+      case "panL": z = 1 + k; fx = 1 - e; break;
+      case "panU": z = 1 + k; fy = 1 - e; break;
+      case "panD": z = 1 + k; fy = e; break;
+      case "none": z = 1 + k; break;
+    }
+    z *= crop;
+    const sc = Math.max(W / vw, H / vh) * z, sw = W / sc, sh = H / sc;
+    let sx = (vw - sw) * fx, sy = (vh - sh) * fy;
+    if (st) { sx = HC.clamp(sx + st[0] * vw, 0, vw - sw); sy = HC.clamp(sy + st[1] * vh, 0, vh - sh); }
+    return { sx, sy, sw, sh };
+  };
+  /* 素材上的一點（0～1）在畫面上的位置（0～1） */
+  HC.toScreen = (cr, x, y, vw, vh) => [(x * vw - cr.sx) / cr.sw, (y * vh - cr.sy) / cr.sh];
+  HC.RAMP_NAMES = { "": "等速", ease: "頭尾慢、中間快", in: "慢慢加速", out: "慢慢減速" };
+  /* 成品畫面大小：res 是短邊（720／1080／2160），比例 16:9、9:16、1:1、4:5 */
+  HC.ASPECTS = { "16:9": [16, 9], "9:16": [9, 16], "1:1": [1, 1], "4:5": [4, 5] };
+  HC.outSize = (res) => {
+    const r = res || HC.state.out.res, s = r === 720 ? 720 : r === 2160 ? 2160 : 1080, [a, b] = HC.ASPECTS[HC.state.out.aspect] || HC.ASPECTS["16:9"];
+    const even = (x) => Math.round(x / 2) * 2;
+    return a >= b ? { W: even(s * a / b), H: s } : { W: s, H: even(s * b / a) };
+  };
+  // 不是 16:9 就要從素材裁一塊出來（目標點決定裁哪裡）
+  HC.vertical = () => (HC.state.out.aspect || "16:9") !== "16:9";
   /* 鏡頭的目標點（推近的中心；直式時也決定保留畫面的哪一塊）：你設定的 > 自動找到的 > 正中央 */
   HC.focusOf = (s) => [s.fx ?? s.afx ?? 0.5, s.fy ?? s.afy ?? 0.5];
 
@@ -83,12 +152,12 @@ window.HC = window.HC || {};
 
   /* ---------- 復原／重做 ---------- */
   const past = [], future = [];
-  const snap = () => JSON.stringify({ shots: HC.state.shots, title: HC.state.title, ending: HC.state.ending, look: HC.state.look, ex: HC.state.clips.map((c) => [c.id, c.excluded, c.sceneMark || "", c.stype || ""]) });
+  const snap = () => JSON.stringify({ shots: HC.state.shots, title: HC.state.title, ending: HC.state.ending, look: HC.state.look, ex: HC.state.clips.map((c) => [c.id, c.excluded, c.sceneMark || "", c.stype || "", c.tod || ""]) });
   const restore = (j) => {
     const o = JSON.parse(j);
     HC.state.shots = o.shots;
     HC.state.title = o.title; HC.state.ending = o.ending; HC.state.look = o.look;
-    for (const [id, ex, mk, st] of o.ex) { const c = HC.clip(id); if (c) { c.excluded = ex; c.sceneMark = mk || ""; c.stype = st || ""; } }
+    for (const [id, ex, mk, st, td] of o.ex) { const c = HC.clip(id); if (c) { c.excluded = ex; c.sceneMark = mk || ""; c.stype = st || ""; c.tod = td || ""; } }
     HC.computeScenes && HC.computeScenes();
   };
   HC.commit = () => { past.push(snap()); if (past.length > 80) past.shift(); future.length = 0; };

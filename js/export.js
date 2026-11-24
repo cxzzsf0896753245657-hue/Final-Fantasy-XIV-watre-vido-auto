@@ -83,6 +83,44 @@
     return seekSource(clip);
   }
 
+  /* ---------- 流暢預覽：做一份 640×360、每 0.5 秒一個關鍵格的代理檔（跳轉、播放都輕很多） ---------- */
+  HC.makeProxy = async (clip, onProgress) => {
+    if (!clip.file || !window.Mp4Muxer || typeof VideoEncoder !== "function") return false;
+    const ix = await HC.mp4Index(clip.file).catch(() => null);
+    if (!ix) return false;
+    const W = 640, H = 360, cfg = { codec: "avc1.42e01e", width: W, height: H, bitrate: 1.2e6, framerate: 30, avc: { format: "avc" } };
+    try { if (!(await VideoEncoder.isConfigSupported(cfg)).supported) return false; } catch (e) { return false; }
+    const target = new Mp4Muxer.ArrayBufferTarget();
+    const muxer = new Mp4Muxer.Muxer({ target, fastStart: "in-memory", firstTimestampBehavior: "offset", video: { codec: "avc", width: W, height: H } });
+    let fail = null;
+    const enc = new VideoEncoder({ output: (ch, meta) => muxer.addVideoChunk(ch, meta), error: (e) => { fail = e; } });
+    enc.configure(cfg);
+    const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+    const cx = cv.getContext("2d");
+    const src = HC.decodeSource(clip.file, ix, 0);
+    let first = null, lastKey = -1e9, n = 0;
+    try {
+      for (;;) {
+        const fr = await src.nextFrame();
+        if (!fr || fail) break;
+        const t = fr.timestamp / 1e6;
+        if (first == null) first = t;
+        cx.drawImage(fr, 0, 0, W, H);
+        const vf = new VideoFrame(cv, { timestamp: Math.round((t - first) * 1e6) });
+        const key = t - lastKey >= 0.5; if (key) lastKey = t;
+        enc.encode(vf, { keyFrame: key }); vf.close();
+        while (enc.encodeQueueSize > 8) await new Promise((r) => setTimeout(r, 4));
+        if (++n % 30 === 0) { onProgress && onProgress(Math.min(1, t / (clip.dur || 1))); await new Promise((r) => setTimeout(r, 0)); }
+      }
+      await enc.flush();
+      if (fail) throw fail;
+      muxer.finalize();
+    } finally { src.close(); try { enc.close(); } catch (e) {} }
+    clip.proxyUrl = URL.createObjectURL(new Blob([target.buffer], { type: "video/mp4" }));
+    clip.proxyShift = first || 0;
+    return true;
+  };
+
   R.exportFrames = async (onProgress, isCancelled) => {
     const S = HC.state, canvas = R.canvas();
     const fps = S.out.fps || 30, { W, H } = HC.outSize();
@@ -129,14 +167,26 @@
         if (fail) throw fail;
         const T = Math.min(n / fps, total - 1e-3), at = HC.shotAt(T);
         if (!at) continue;
-        const sh = S.shots, src = (i, lt) => sh[i].start + lt * sh[i].speed;
+        const sh = S.shots, src = (i, lt) => HC.srcTime(sh[i], lt);
         const need = at.overlap ? [at.i - 1, at.i] : [at.i];
-        for (const [i, s] of open) if (!need.includes(i)) { s.close(); open.delete(i); }
+        for (const [i, s] of open) if (!need.includes(typeof i === "number" ? i : +String(i).split(":")[0])) { s.close(); open.delete(i); }
         for (const i of need) if (!open.has(i)) {
           const c = HC.clip(sh[i].clipId);
           if (!c || c.missing || !c.url) throw new Error("缺少素材：" + (c ? c.name : ""));
           const s = await openSource(c, sh[i].start); open.set(i, s); used[s.kind]++;
         }
+        // 日夜對比、子母畫面用到的其他素材
+        const ex = new Map();
+        for (const i of need) {
+          const lt = i === at.i ? at.off : T - starts[i];
+          for (const [kind, ref] of HC.exSpecs(sh[i])) {
+            const key = i + ":" + kind, c = HC.clip(ref.clipId);
+            if (!c || !c.url) continue;
+            if (!open.has(key)) { const s2 = await openSource(c, ref.start); open.set(key, s2); used[s2.kind]++; }
+            ex.set(sh[i].id + ":" + kind, await open.get(key).frameAt(HC.clamp(ref.start + lt * sh[i].speed, 0, (c.dur || 1e9) - 0.05)));
+          }
+        }
+        R.exOverride = ex;
         if (at.overlap) {
           const p = at.i - 1, plt = T - starts[p];
           const [a, b] = await Promise.all([open.get(p).frameAt(src(p, plt)), open.get(at.i).frameAt(src(at.i, at.off))]);
@@ -165,6 +215,7 @@
       try { venc.state !== "closed" && venc.close(); } catch (e) {}
       try { aenc && aenc.state !== "closed" && aenc.close(); } catch (e) {}
       for (const s of open.values()) s.close();
+      R.exOverride = null;
       canvas.width = W0; canvas.height = H0;
       R.exporting = false;
     }

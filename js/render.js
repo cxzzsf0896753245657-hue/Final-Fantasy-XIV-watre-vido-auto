@@ -25,7 +25,8 @@
     return v;
   }
   // 畫面的素材時間（逐格匯出時 v 可能是解碼出來的 VideoFrame）
-  const mt = (v) => (v.timestamp != null && v.currentTime == null ? v.timestamp / 1e6 : v._mt != null && !v.seeking ? v._mt : v.currentTime);
+  // 流暢預覽用的代理檔時間從 0 開始，原始素材可能從 0.05 秒開始：_shift 把它換回原始素材的時間
+  const mt = (v) => (v.timestamp != null && v.currentTime == null ? v.timestamp / 1e6 : (v._mt != null && !v.seeking ? v._mt : v.currentTime) + (v._shift || 0));
 
   R.init = (cv) => { canvas = cv; ctx = cv.getContext("2d"); clear(); };
   R.canvas = () => canvas;
@@ -40,30 +41,70 @@
 
   /* ---------- 一個鏡頭的單格：縮放、平移、防抖、濾鏡 ---------- */
   const ease = (p) => 0.5 - 0.5 * Math.cos(Math.PI * HC.clamp(p, 0, 1));
-  function drawShot(c, v, s, lt) {
-    const W = canvas.width, H = canvas.height, od = HC.outDur(s);
-    const e = ease(lt / od), k = s.zoom || 0;
-    // 以目標點為中心縮放：目標點在畫面上的位置不變，周圍放大（直式時也用它決定保留哪一塊）
-    let z = 1, [fx, fy] = HC.focusOf(s);
-    switch (s.mode) {
-      case "in": z = 1 + k * e; break;
-      case "out": z = 1 + k - k * e; break;
-      case "panR": z = 1 + k; fx = e; break;
-      case "panL": z = 1 + k; fx = 1 - e; break;
-      case "panU": z = 1 + k; fy = 1 - e; break;
-      case "panD": z = 1 + k; fy = e; break;
-      case "none": z = 1 + k; break;
+  /* 鏡頭用到的其他素材（日夜對比的另一邊、子母畫面）：播放時用額外的 <video>，逐格匯出時由 export.js 提供 */
+  const exPool = new Map();
+  R.exOverride = null;   // 逐格匯出：Map(「鏡頭 id:種類」→ 畫面)
+  const exSpecs = (s) => [s.split ? ["split", s.split] : null, s.pip ? ["pip", s.pip] : null].filter(Boolean);
+  HC.exSpecs = exSpecs;
+  const exGet = (s, kind) => {
+    if (R.exOverride) return R.exOverride.get(s.id + ":" + kind) || null;
+    const v = exPool.get(s.id + ":" + kind);
+    return v && v.readyState >= 2 ? v : null;
+  };
+  function exEl(key) {
+    let v = exPool.get(key);
+    if (!v) { v = document.createElement("video"); v.muted = true; v.playsInline = true; v.preload = "auto"; exPool.set(key, v); }
+    return v;
+  }
+  /* exact：暫停狀態要等跳轉完成；播放中只在差太多時修正 */
+  async function exSync(s, lt, exact) {
+    for (const [kind, ref] of exSpecs(s)) {
+      const c = HC.clip(ref.clipId); if (!c || !c.url) continue;
+      const v = exEl(s.id + ":" + kind), t = HC.clamp(ref.start + lt * s.speed, 0, (c.dur || 1e9) - 0.05);
+      if (v.dataset.clip !== c.id) { v.src = c.url; v.dataset.clip = c.id; v._loading = HC.once(v, "loadeddata", 15000).catch(() => {}); }
+      if (v._loading) { if (!exact) { v._loading.then(() => { v._loading = null; }); continue; } await v._loading; v._loading = null; }
+      if (exact) { v.pause(); if (Math.abs(v.currentTime - t) > 0.02) { v.currentTime = t; await HC.once(v, "seeked", 8000).catch(() => {}); } }
+      else {
+        v.playbackRate = s.speed;
+        if (Math.abs(v.currentTime - t) > 0.3) v.currentTime = t;
+        if (v.paused && playing) v.play().catch(() => {});
+      }
     }
+  }
+  function exPauseExcept(keep) { for (const [k, v] of exPool) if (!keep.has(k.split(":")[0])) v.pause(); }
+  R.exSync = exSync;
+
+  function drawShot(c, v, s, lt) {
+    const W = canvas.width, H = canvas.height;
     const vw = v.videoWidth || v.displayWidth || 1920, vh = v.videoHeight || v.displayHeight || 1080;
     const st = s.stab ? HC.stabOffset(s, mt(v)) : null;   // 防抖：稍微放大，再把畫面往晃動的反方向挪
-    if (st) z *= HC.stabCrop(s);
-    const sc = Math.max(W / vw, H / vh) * z, sw = W / sc, sh = H / sc;
-    let sx = (vw - sw) * fx, sy = (vh - sh) * fy;
-    if (st) { sx = HC.clamp(sx + st[0] * vw, 0, vw - sw); sy = HC.clamp(sy + st[1] * vh, 0, vh - sh); }
-    const L = HC.state.look;
-    if (HC.canFilter) c.filter = HC.filterCss(s.filter || L.filter, L.filterStr ?? 1) || "none";
-    c.drawImage(v, sx, sy, sw, sh, 0, 0, W, H);
+    // 以目標點為中心縮放：目標點在畫面上的位置不變，周圍放大（直式時也用它決定保留哪一塊）
+    const cr = HC.cropAt(s, lt, vw, vh, W, H, st, st ? HC.stabCrop(s) : 1);
+    const L = HC.state.look, filt = [HC.adjCss(s), HC.filterCss(s.filter || L.filter, L.filterStr ?? 1)].filter(Boolean).join(" ") || "none";
+    if (HC.canFilter) c.filter = filt;
+    c.drawImage(v, cr.sx, cr.sy, cr.sw, cr.sh, 0, 0, W, H);
+    // 日夜對比：另一邊用同樣的裁切，分隔線從右掃到左
+    const sv = s.split && exGet(s, "split");
+    if (sv) {
+      const d = HC.splitPos(lt, HC.outDur(s));
+      c.save(); c.beginPath(); c.rect(W * d, 0, W * (1 - d), H); c.clip();
+      const bw = sv.videoWidth || sv.displayWidth || vw, bh = sv.videoHeight || sv.displayHeight || vh, cb = HC.cropAt(s, lt, bw, bh, W, H);
+      c.drawImage(sv, cb.sx, cb.sy, cb.sw, cb.sh, 0, 0, W, H);
+      c.restore();
+    }
     if (HC.canFilter) c.filter = "none";
+    // 色溫：暖色／冷色的柔光層
+    const tf = HC.tempFill(s);
+    if (tf) { c.save(); c.globalCompositeOperation = "soft-light"; c.fillStyle = tf; c.fillRect(0, 0, W, H); c.restore(); }
+    if (s.split) HC.drawSplitUI(c, W, H, HC.splitPos(lt, HC.outDur(s)), s.split.labels || ["白天", "夜晚"], lt, HC.outDur(s));
+    // 子母畫面
+    const pv = s.pip && exGet(s, "pip");
+    if (pv) HC.drawPip(c, W, H, pv, s.pip, lt, HC.outDur(s), HC.canFilter ? filt : "");
+    // 標註：跟著畫面一起動
+    if (s.labels && s.labels.length) for (const lb of s.labels) {
+      const [x, y] = HC.toScreen(cr, lb.x, lb.y, vw, vh);
+      HC.drawLabel(c, W, H, x * W, y * H, lb, lt, HC.outDur(s));
+    }
   }
 
   /* 疊加層需要的資訊 */
@@ -71,7 +112,7 @@
     const S = HC.state, { starts, total } = HC.timeline();
     return {
       // 暫停時不套片頭片尾的淡入淡出，才看得到畫面
-      T, total, fi: still ? 0 : S.out.fi, fo: still ? 0 : S.out.fo, look: S.look, title: S.title, ending: S.ending,
+      T, total, fi: still ? 0 : S.out.fi, fo: still ? 0 : S.out.fo, look: S.look, title: S.title, ending: S.ending, wm: S.wm,
       captions: S.shots.map((s, i) => s.text ? { text: s.text, start: starts[i], dur: HC.outDur(s) } : null).filter(Boolean),
     };
   };
@@ -86,7 +127,7 @@
       const { starts } = HC.timeline(), s = S.shots[ni], d = HC.trDur(ni);
       HC.drawTransition(ctx, bufA, bufB, d ? (T - starts[ni]) / d : 1, s.tr ? s.tr.type : "cut", W, H);
     } else drawShot(ctx, pv, S.shots[pi], plt);
-    HC.drawOverlay(ctx, W, H, R.overlayInfo(T, still), canvas);
+    if (!R.noOverlay) HC.drawOverlay(ctx, W, H, R.overlayInfo(T, still), canvas);
     lastDraw = performance.now();
   }
   R.compose = compose;   // 逐格匯出（export.js）用
@@ -95,9 +136,11 @@
   async function load(v, s, off) {
     const c = HC.clip(s.clipId);
     if (!c) throw new Error("missing clip");
-    if (v.dataset.clip !== c.id) { v.src = c.url; v.dataset.clip = c.id; await HC.once(v, "loadeddata", 15000); }
-    v.playbackRate = s.speed;
-    const target = HC.clamp(s.start + off * s.speed, 0, (v.duration || 1e9) - 0.05);
+    const px = HC.state.out.proxy && c.proxyUrl, url = px ? c.proxyUrl : c.url;
+    if (v.dataset.clip !== c.id || v.dataset.url !== url) { v.src = url; v.dataset.clip = c.id; v.dataset.url = url; v._shift = px ? c.proxyShift || 0 : 0; v._mt = null; await HC.once(v, "loadeddata", 15000); }
+    frozenAt.delete(v);
+    v.playbackRate = HC.clamp(HC.rateAt(s, off), 0.0625, 16);
+    const target = HC.clamp(HC.srcTime(s, off) - (v._shift || 0), 0, (v.duration || 1e9) - 0.05);
     if (Math.abs(v.currentTime - target) > 0.01) { v.currentTime = target; await HC.once(v, "seeked"); }
   }
   function prepareNext(tk) {
@@ -118,11 +161,13 @@
       if (at.overlap) {
         await load(vids[cur], S.shots[at.i - 1], T - starts[at.i - 1]);
         await load(vids[1 - cur], S.shots[at.i], at.off);
+        await exSync(S.shots[at.i - 1], T - starts[at.i - 1], true); await exSync(S.shots[at.i], at.off, true);
         if (tk !== token) return;
         idx = at.i - 1; R.T = T;
         compose(T, vids[cur], at.i - 1, T - starts[at.i - 1], vids[1 - cur], at.i, at.off, true);
       } else {
         await load(vids[cur], S.shots[at.i], at.off);
+        await exSync(S.shots[at.i], at.off, true);
         if (tk !== token) return;
         idx = at.i; R.T = T;
         compose(T, vids[cur], at.i, at.off, null, null, null, true);
@@ -167,19 +212,39 @@
     if (R.exporting && !force) return;
     playing = false; advancing = false; nextOn = false;
     vids.forEach((v) => v.pause());
+    for (const v of exPool.values()) v.pause();
     R.music.stop();
     R.onState && R.onState(false);
   };
   R.isPlaying = () => playing;
 
+  /* 影片時間 → 鏡頭時間；定格的部分影片已經停了，改用時鐘算 */
+  const frozenAt = new WeakMap();
+  function ltOf(v, s) {
+    let lt = HC.ltOfSrc(s, mt(v));
+    const md = HC.moveDur(s);
+    if (s.freeze > 0 && lt >= md - 0.03) {
+      if (!frozenAt.has(v)) frozenAt.set(v, performance.now() - Math.max(0, lt - md) * 1000);
+      if (!v.paused) v.pause();   // 停在最後一格（緩衝結束後恢復播放時也要再停一次）
+      lt = md + (performance.now() - frozenAt.get(v)) / 1000;
+    } else frozenAt.delete(v);
+    return lt;
+  }
+  // 速度曲線：播放中一直調整播放速度
+  function steer(v, s, lt) {
+    if (s.mode !== "move" || !s.ramp || lt >= HC.moveDur(s)) return;
+    const r = HC.clamp(HC.rateAt(s, lt), 0.0625, 16);
+    if (Math.abs(v.playbackRate - r) > 0.02) v.playbackRate = r;
+  }
   function state() {
     const S = HC.state, s = S.shots[idx], v = vids[cur];
     if (!s) return null;
     const { starts } = HC.timeline();
-    const lt = (mt(v) - s.start) / s.speed;
+    const lt = ltOf(v, s);
     const T = starts[idx] + HC.clamp(lt, 0, HC.outDur(s));
-    const nlt = nextOn ? Math.max(0, (mt(vids[1 - cur]) - S.shots[idx + 1].start) / S.shots[idx + 1].speed) : null;
-    return { s, v, lt, T, nlt, od: HC.outDur(s) };
+    const ns = S.shots[idx + 1];
+    const nlt = nextOn ? Math.max(0, ltOf(vids[1 - cur], ns)) : null;
+    return { s, v, lt, T, nlt, ns, od: HC.outDur(s) };
   }
   function draw() {
     const st = state();
@@ -199,9 +264,12 @@
       const S = HC.state, { starts } = HC.timeline(), ni = idx + 1;
       // 轉場開始：讓下一個鏡頭也開始播
       if (!nextOn && S.shots[ni] && HC.trDur(ni) > 0 && st.T >= starts[ni]) startNext(tk);
-      else if (st.lt >= st.od - 0.017 || st.v.ended) advance(tk);
+      else if (st.lt >= st.od - 0.017 || (st.v.ended && !(st.s.freeze > 0))) advance(tk);
       else {
-        if (!st.v._rvfc || performance.now() - lastDraw > 50) draw();
+        steer(st.v, st.s, st.lt); if (nextOn && st.ns) steer(vids[1 - cur], st.ns, st.nlt);
+        exSync(st.s, st.lt, false); if (nextOn && st.ns) exSync(st.ns, st.nlt, false);
+        exPauseExcept(new Set([st.s.id, nextOn && st.ns ? st.ns.id : ""]));
+        if (!st.v._rvfc || st.v.paused || performance.now() - lastDraw > 50) draw();
         R.T = st.T; R.music.sync(st.T); R.onTime && R.onTime(st.T);
       }
     }
@@ -215,7 +283,7 @@
     if (!ok || tk !== token) { R.stop(true); finishHooks(); return; }
     nextOn = true;
     const nv = vids[1 - cur];
-    nv.playbackRate = HC.state.shots[idx + 1].speed;
+    nv.playbackRate = HC.clamp(HC.rateAt(HC.state.shots[idx + 1], 0), 0.0625, 16);
     await nv.play().catch(() => {});
     advancing = false;
   }
@@ -238,7 +306,7 @@
     }
     cur = 1 - cur; idx++;
     const v = vids[cur];
-    v.playbackRate = S.shots[idx].speed;
+    v.playbackRate = HC.clamp(HC.rateAt(S.shots[idx], 0), 0.0625, 16);
     await v.play().catch(() => {});
     prepareNext(tk);
     advancing = false;

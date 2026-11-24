@@ -406,6 +406,99 @@ function installEffects() {
     ctx.restore();
   };
 
+  /* ---------- 標註（家具、區域）：圓點 → 引線 → 文字框，跟著畫面移動 ---------- */
+  const rr = (ctx, x, y, w, h, r) => { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); };
+  HC.drawLabel = (ctx, W, H, px, py, lb, lt, od) => {
+    const t0 = lb.t0 ?? 0.4, out = Math.min(1, Math.max(0, (od - 0.2 - lt) / 0.5));
+    const k = (a, b) => clamp((lt - t0 - a) / (b - a), 0, 1), ez = (p) => 1 - (1 - p) ** 3;
+    const dot = ez(k(0, 0.3)), line = ez(k(0.2, 0.6)), box = ez(k(0.5, 0.9));
+    if (dot <= 0 || out <= 0) return;
+    if (px < -W * 0.1 || px > W * 1.1 || py < -H * 0.1 || py > H * 1.1) return;   // 鏡頭移開了
+    const u = Math.min(W, H) / 1080, side = lb.side || "ne";
+    const dx = (side.includes("e") ? 1 : -1) * 70 * u, dy = (side.includes("n") ? -1 : 1) * 70 * u;
+    const ex = px + dx * line, ey = py + dy * line;
+    ctx.save();
+    ctx.globalAlpha = out;
+    ctx.shadowColor = "rgba(0,0,0,.45)"; ctx.shadowBlur = 6 * u;
+    ctx.strokeStyle = "#fff"; ctx.lineWidth = 3 * u;
+    if (line > 0) { ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(ex, ey); ctx.stroke(); }
+    ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(px, py, 9 * u * dot, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,.6)"; ctx.lineWidth = 2 * u; ctx.beginPath(); ctx.arc(px, py, 16 * u * dot, 0, Math.PI * 2); ctx.stroke();
+    if (box > 0 && lb.text) {
+      const fs = 34 * u, sub = lb.sub || "";
+      ctx.font = `600 ${fs}px "Noto Sans TC", sans-serif`;
+      const w1 = ctx.measureText(lb.text).width;
+      ctx.font = `400 ${fs * 0.62}px "Noto Sans TC", sans-serif`;
+      const w2 = sub ? ctx.measureText(sub).width : 0;
+      const bw = Math.max(w1, w2) + 36 * u, bh = (sub ? fs * 1.75 : fs * 1.1) + 22 * u;
+      const bx = side.includes("e") ? ex : ex - bw, by = side.includes("n") ? ey - bh : ey;
+      ctx.globalAlpha = out * box;
+      ctx.shadowBlur = 14 * u; ctx.fillStyle = "rgba(18,18,24,.72)"; rr(ctx, bx, by, bw, bh, 10 * u); ctx.fill();
+      ctx.shadowBlur = 0; ctx.fillStyle = "#fff"; ctx.textBaseline = "top"; ctx.textAlign = "left";
+      ctx.font = `600 ${fs}px "Noto Sans TC", sans-serif`; ctx.fillText(lb.text, bx + 18 * u, by + 12 * u + (1 - box) * 8 * u);
+      if (sub) { ctx.fillStyle = "rgba(255,255,255,.75)"; ctx.font = `400 ${fs * 0.62}px "Noto Sans TC", sans-serif`; ctx.fillText(sub, bx + 18 * u, by + 12 * u + fs * 1.15); }
+    }
+    ctx.restore();
+  };
+
+  /* ---------- 日夜對比：分隔線位置（1 = 全部是 A，0 = 全部是 B） ---------- */
+  HC.splitPos = (lt, od) => { const p = clamp((lt - 0.6) / Math.max(0.5, od - 1.6), 0, 1); return 1 - (0.5 - 0.5 * Math.cos(Math.PI * p)) * 0.5; };
+  HC.drawSplitUI = (ctx, W, H, d, labels, lt, od) => {
+    const u = Math.min(W, H) / 1080, a = clamp(lt / 0.5, 0, 1) * clamp((od - lt) / 0.5, 0, 1);
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.fillStyle = "#fff"; ctx.fillRect(W * d - 2 * u, 0, 4 * u, H);
+    ctx.font = `600 ${40 * u}px "Noto Sans TC", sans-serif`; ctx.textBaseline = "top";
+    ctx.shadowColor = "rgba(0,0,0,.6)"; ctx.shadowBlur = 10 * u;
+    ctx.textAlign = "left"; ctx.globalAlpha = a * clamp((d - 0.12) / 0.1, 0, 1); ctx.fillText(labels[0] || "", 40 * u, 36 * u);
+    ctx.textAlign = "right"; ctx.globalAlpha = a * clamp((0.88 - d) / 0.1, 0, 1); ctx.fillText(labels[1] || "", W - 40 * u, 36 * u);
+    ctx.restore();
+  };
+
+  /* ---------- 子母畫面 ---------- */
+  HC.pipRect = (W, H, p) => {
+    const u = Math.min(W, H) / 1080, w = W * (p.size || 0.3), h = w * 9 / 16, m = 40 * u, cn = p.corner || "br";
+    return { x: cn.includes("r") ? W - w - m : m, y: cn.includes("b") ? H - h - m : m, w, h, u };
+  };
+  HC.drawPip = (ctx, W, H, v, p, lt, od, filter) => {
+    const r = HC.pipRect(W, H, p), a = clamp(lt / 0.5, 0, 1) * clamp((od - lt) / 0.5, 0, 1);
+    if (a <= 0) return;
+    const vw = v.videoWidth || v.displayWidth || 1920, vh = v.videoHeight || v.displayHeight || 1080;
+    const sc = Math.max(r.w / vw, r.h / vh), sw = r.w / sc, sh = r.h / sc;
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.shadowColor = "rgba(0,0,0,.5)"; ctx.shadowBlur = 24 * r.u;
+    ctx.fillStyle = "#fff"; rr(ctx, r.x - 4 * r.u, r.y - 4 * r.u, r.w + 8 * r.u, r.h + 8 * r.u, 14 * r.u); ctx.fill();
+    ctx.shadowBlur = 0;
+    rr(ctx, r.x, r.y, r.w, r.h, 10 * r.u); ctx.clip();
+    if (filter) ctx.filter = filter;
+    ctx.drawImage(v, (vw - sw) / 2, (vh - sh) / 2, sw, sh, r.x, r.y, r.w, r.h);
+    ctx.restore();
+  };
+
+  /* ---------- 浮水印（文字或圖片，放在角落） ---------- */
+  HC.drawWatermark = (ctx, W, H, wm) => {
+    if (!wm || !wm.on) return;
+    const u = Math.min(W, H) / 1080, m = 36 * u, cn = wm.corner || "br";
+    ctx.save();
+    ctx.globalAlpha = wm.opacity ?? 0.75;
+    if (wm.kind === "image" && wm.img) {
+      if (!wm._img || wm._img._src !== wm.img) { wm._img = new Image(); wm._img._src = wm.img; wm._img.src = wm.img; }
+      const im = wm._img;
+      if (im.complete && im.naturalWidth) {
+        const w = W * (wm.size || 0.1) * 1.4, h = w * im.naturalHeight / im.naturalWidth;
+        ctx.drawImage(im, cn.includes("r") ? W - w - m : m, cn.includes("b") ? H - h - m : m, w, h);
+      }
+    } else if (wm.text) {
+      const fs = Math.max(18, 260 * u * (wm.size || 0.1));
+      ctx.font = `600 ${fs}px "Noto Sans TC", sans-serif`; ctx.fillStyle = "#fff";
+      ctx.shadowColor = "rgba(0,0,0,.55)"; ctx.shadowBlur = 6 * u;
+      ctx.textAlign = cn.includes("r") ? "right" : "left"; ctx.textBaseline = cn.includes("b") ? "bottom" : "top";
+      ctx.fillText(wm.text, cn.includes("r") ? W - m : m, cn.includes("b") ? H - m : m);
+    }
+    ctx.restore();
+  };
+
   /* 整個疊加層：特效 → 濾鏡色調 → 鏡頭文字 → 開頭 → 片尾 → 片頭片尾黑場
      info = { T, total, fi, fo, look, title, ending, captions:[{text,start,dur}] } */
   HC.drawOverlay = (ctx, W, H, info, frame) => {
@@ -413,6 +506,14 @@ function installEffects() {
     HC.drawEffects(ctx, W, H, T, info.look && info.look.fx, frame);
     if (info.look && info.look.filter) { const t = HC.tintFill(info.look.filter, info.look.tintStr ?? 1); if (t) { ctx.save(); ctx.globalCompositeOperation = "soft-light"; ctx.fillStyle = t; ctx.fillRect(0, 0, W, H); ctx.restore(); } }
     for (const c of info.captions || []) if (T >= c.start && T < c.start + c.dur) HC.drawCaption(ctx, W, H, c.text, T - c.start, c.dur, info.title.font);
+    // HyperFrames 用：標註的位置事先算好（每 0.1 秒一點）
+    for (const lb of info.labels || []) {
+      if (T < lb.start || T >= lb.start + lb.dur || !lb.pts.length) continue;
+      const lt = T - lb.start, f = lt * 10, i = Math.min(lb.pts.length - 1, Math.floor(f)), j = Math.min(lb.pts.length - 1, i + 1), w = f - i;
+      HC.drawLabel(ctx, W, H, (lb.pts[i][0] * (1 - w) + lb.pts[j][0] * w) * W, (lb.pts[i][1] * (1 - w) + lb.pts[j][1] * w) * H, lb, lt, lb.dur);
+    }
+    for (const sp of info.splits || []) if (T >= sp.start && T < sp.start + sp.dur) HC.drawSplitUI(ctx, W, H, HC.splitPos(T - sp.start, sp.dur), sp.labels, T - sp.start, sp.dur);
+    HC.drawWatermark(ctx, W, H, info.wm);
     if (info.title) HC.drawTitleBlock(ctx, W, H, T, info.title, false);
     const E = info.ending;
     if (E && E.template !== "none" && E.main) {

@@ -103,8 +103,10 @@
     HC.state.clips.sort((x, y) => (x.time - y.time) || x.name.localeCompare(y.name, undefined, { numeric: true }));
   };
 
-  HC.autoEdit = () => {
-    const S = HC.state, opt = S.auto, T = HC.TUNE;
+  /* over：這次剪輯用的額外設定（做「好幾個版本」時用），不會改到你的設定
+     dry：只產生鏡頭、不放進時間軸 */
+  HC.autoEdit = (over, dry) => {
+    const S = HC.state, opt = { ...S.auto }, T = HC.TUNE;
     // 套用學到的風格：把學到的數值填進設定（介面上的滑桿也會跟著變）
     // 還沒學過任何東西時不覆蓋你調的滑桿（預設風格和滑桿預設值一樣，套了沒意義）
     const L = opt.learn && HC.hasLearned && HC.hasLearned() ? HC.profile.style : null;
@@ -113,8 +115,13 @@
       T.longStill = +HC.clamp(L.longStill, 3, 12).toFixed(1); T.shortStill = +HC.clamp(L.shortStill, 1.5, 4).toFixed(1); T.maxMove = Math.round(HC.clamp(L.maxMove, 4, 20));
       opt.rhythm = +HC.clamp(L.rhythm, 0, 1).toFixed(2); opt.zoom = +HC.clamp(L.zoom, 0.04, 0.3).toFixed(2);
       opt.speed = [0.6, 0.8, 1].reduce((b, v) => Math.abs(v - L.moveSpeed) < Math.abs(b - L.moveSpeed) ? v : b, 0.8);
-      if (L.len) opt.len = Math.round(HC.clamp(L.len, 30, 300) / 5) * 5;
+      if (L.len && !opt.lenSet) opt.len = Math.round(HC.clamp(L.len, 30, 300) / 5) * 5;
+      // 滑桿跟著學到的值走（只有真的套用到時間軸時）
+      if (!dry) Object.assign(S.auto, { rhythm: opt.rhythm, zoom: opt.zoom, speed: opt.speed, len: opt.len });
     }
+    // 目標長度：有背景音樂時，不要超過音樂能用的長度
+    if (opt.fitMusic !== false && S.music.url && HC.R && HC.R.music.el.duration > 0) opt.len = Math.min(opt.len, Math.max(20, HC.R.music.el.duration - (S.music.off || 0)));
+    if (over) { Object.assign(opt, over); if (over.T) Object.assign(T, over.T); }
     HC.sortClips();
     HC.computeScenes();
     const clips = S.clips.filter((c) => c.ana);
@@ -143,11 +150,17 @@
     // 每支素材最多用幾個鏡頭（學到你通常一支素材用幾個）
     const cap = L && L.perClip ? Math.max(1, Math.ceil(L.perClip * 1.5)) : 99;
     const count = (id) => picked.filter((p) => p.clipId === id).length;
+    // 角度幾乎一樣的片段只留分數最高的一個（同一個角落拍了好幾次）
+    const asShot = (x) => ({ clipId: x.clipId, start: x.a, dur: x.b - x.a });
+    const dup = (x) => opt.dedupe !== false && x.type !== "M" && picked.some((p) => p.type !== "M" && p.clipId !== x.clipId && HC.shotSimilarity && HC.shotSimilarity(asShot(p), asShot(x)) > 0.85);
+    let skipped = 0;
     for (const x of cands.slice().sort((p, q) => q.score - p.score)) {
       if (total >= opt.len) break;
       if (picked.includes(x) || clash(x) || count(x.clipId) >= cap) continue;
+      if (dup(x)) { skipped++; continue; }
       picked.push(x); total += nominal(x);
     }
+    HC.lastDedupe = skipped;
     picked.sort((p, q) => (order.get(p.clipId) - order.get(q.clipId)) || (p.a - q.a));
 
     // 效果：照你常用的比例輪流（可依場景類型），再看畫面內容調整（細節集中 → 推近、一邊細節多 → 平移）
@@ -209,10 +222,13 @@
     const ordered = HC.orderShots(shots, opt, L);
     // 轉場：依學到的偏好、或你指定的轉場
     HC.assignTransitions(ordered, opt, L);
+    // 長度：調整靜止鏡頭的長短（和運鏡的速度），讓總長接近目標
+    HC.fitLength(ordered, opt.len);
     // 剪接點對齊音樂拍點
     if (opt.beat && HC.snapToBeats) HC.snapToBeats(ordered);
     for (const s of ordered) { if (s._beat && s.why) s.why.push("結尾對齊音樂拍點"); delete s._beat; }
     for (const s of ordered) s.orig = { start: s.start, dur: s.dur, mode: s.mode, zoom: s.zoom, speed: s.speed };
+    if (dry) { Object.assign(T, HC.TUNE_DEFAULT); return ordered; }
     S.shots = ordered;
     HC.markAuto && HC.markAuto();
     return ordered;
@@ -306,6 +322,11 @@
     return out;
   };
   HC.orderShots = (shots, opt, L) => {
+    // 白天的場景排前面、夜晚排後面（同類的照拍攝時間），影片會從白天走到夜晚
+    if (opt.dayNight !== false && HC.shotTod) {
+      const sc = scenes(shots), rank = (g) => (HC.shotTod(g[0]) === "night" ? 1 : 0);
+      shots = sc.map((g, k) => [g, k]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1]).flatMap(([g]) => g);
+    }
     const mode = opt.order === "learn" ? (L && L.order && L.order.n ? (L.order.chrono >= 0.7 ? "time" : "seq") : "time") : opt.order;
     if (mode === "time" || shots.length < 3) return shots;
     const seq = mode === "seq" ? L.order.seq : { SS: 0.2, SM: 0.8, MS: 0.8, MM: 0.2 };
@@ -326,6 +347,57 @@
         out.push(nx); rest.splice(rest.indexOf(nx), 1);
       }
     });
+    return out;
+  };
+
+  /* ---------- 長度：讓總長接近目標 ----------
+     先調靜止鏡頭（2～12 秒，素材夠長才能拉長），不夠再微調運鏡的速度（0.6～1.25 倍） */
+  HC.fitLength = (shots, target) => {
+    if (!target || !shots.length) return;
+    const saved = HC.state.shots; HC.state.shots = shots;
+    try {
+      for (let pass = 0; pass < 4; pass++) {
+        const total = HC.timeline().total, diff = target - total;
+        if (Math.abs(diff) < Math.max(1, target * 0.03)) break;
+        const stills = shots.filter((s) => s.mode !== "move");
+        const room = (s) => { const c = HC.clip(s.clipId); return diff > 0 ? Math.min(12, c && c.dur ? c.dur - s.start - 0.05 : 12) - s.dur : s.dur - 2; };
+        const R = stills.reduce((a, s) => a + Math.max(0, room(s)), 0);
+        if (R > 0.5) {
+          for (const s of stills) { const r = Math.max(0, room(s)), d = HC.clamp(diff * r / R, -r, r); s.dur = +(s.dur + d).toFixed(2); }
+        } else {
+          const moves = shots.filter((s) => s.mode === "move"), md = moves.reduce((a, s) => a + s.dur / s.speed, 0);
+          if (!md) break;
+          const f = HC.clamp(md / Math.max(1, md + diff), 0.6 / 0.8, 1.25 / 0.8);
+          for (const s of moves) s.speed = +HC.clamp(s.speed * f, 0.6, 1.25).toFixed(2);
+        }
+      }
+    } finally { HC.state.shots = saved; }
+  };
+
+  /* ---------- 做好幾個版本讓你挑 ---------- */
+  HC.VARIANTS = [
+    { id: "calm", name: "慢慢欣賞", desc: "長鏡頭、慢運鏡，適合仔細看佈置", over: { rhythm: 0.15, speed: 0.6, T: { longStill: 8, shortStill: 3.5 } } },
+    { id: "brisk", name: "節奏輕快", desc: "長短鏡頭交錯、運鏡原速", over: { rhythm: 0.75, speed: 1, T: { longStill: 4.5, shortStill: 2 } } },
+    { id: "teaser", name: "60 秒精華", desc: "只留最好看的鏡頭", over: { len: 60, rhythm: 0.55, speed: 0.8, cover: false, T: { longStill: 5, shortStill: 2.5 } } },
+  ];
+  HC.makeVariants = () => HC.VARIANTS.map((v) => ({ ...v, shots: HC.autoEdit(v.over, true) }));
+
+  /* ---------- 短影音版：從目前的時間軸挑最好的鏡頭 ---------- */
+  HC.makeShort = (shots, target = 45) => {
+    const score = (s) => (s.fb === 1 ? 3 : s.fb === -1 ? -3 : 0) + (HC.predict ? HC.predict(HC.features(s.clipId, s.start, s.start + s.dur, s.mode === "move")) || 0.5 : 0.5) + (s.split ? 1 : 0) + (s.labels ? 0.3 : 0);
+    const ranked = shots.map((s, i) => ({ s, i, sc: score(s) })).sort((a, b) => b.sc - a.sc);
+    const keep = []; let t = 0;
+    for (const r of ranked) {
+      const s = JSON.parse(JSON.stringify(r.s)); s.id = HC.uid("s");
+      if (s.mode === "move") { s.speed = Math.max(s.speed, 1); s.dur = Math.min(s.dur, 5 * s.speed); delete s.freeze; }
+      else s.dur = Math.min(s.dur, 3.5);
+      const d = s.dur / s.speed;
+      if (t + d > target + 2) continue;
+      keep.push({ s, i: r.i }); t += d;
+      if (t >= target - 2) break;
+    }
+    const out = keep.sort((a, b) => a.i - b.i).map((k) => k.s);
+    out.forEach((s, k) => { s.tr = k ? { type: "cut", dur: 0 } : s.tr; s.why = ["短影音版：從完整版挑出分數最高的鏡頭"]; });
     return out;
   };
 

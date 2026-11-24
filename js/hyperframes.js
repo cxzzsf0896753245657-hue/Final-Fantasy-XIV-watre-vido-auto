@@ -29,6 +29,10 @@
       case "panU": return [{ scale: z, y: -span(z, H) }, { scale: z, y: span(z, H) }];
       case "panD": return [{ scale: z, y: span(z, H) }, { scale: z, y: -span(z, H) }];
       case "none": return [{ scale: z }, { scale: z }];
+      case "path": {   // 自訂路徑：以畫面中心縮放，再位移到目標點
+        const p = s.kf || HC.defaultPath(s), f = (q) => ({ scale: r3(q.z), x: r3((q.z - 1) * (0.5 - q.x) * W), y: r3((q.z - 1) * (0.5 - q.y) * H) });
+        return [f(p.a), f(p.b)];
+      }
       default: return null;
     }
   }
@@ -49,7 +53,7 @@
     const DW = Math.max(W, H * 16 / 9), DH = Math.max(H, W * 9 / 16);
     const S = HC.state, { starts, total } = HC.timeline();
     const shots = S.shots;
-    const used = [...new Set(shots.map((s) => s.clipId))].map((id) => HC.clip(id));
+    const used = [...new Set(shots.flatMap((s) => [s.clipId, s.split && s.split.clipId, s.pip && s.pip.clipId]).filter(Boolean))].map((id) => HC.clip(id)).filter(Boolean);
     const fileOf = new Map(used.map((c, i) => [c.id, `assets/clip${String(i + 1).padStart(2, "0")}.${extOf(c.name, "mp4")}`]));
     const hasMusic = !!S.music.url;
     const musicFile = hasMusic ? `assets/music.${extOf(S.music.name, "mp3")}` : null;
@@ -70,7 +74,7 @@
       if (!s.stab || !HC.stabReady(s)) return;
       const crop = HC.stabCrop(s), keys = [];
       for (let t = 0; t <= HC.outDur(s) + 1e-6; t += 1 / 30) {
-        const o = HC.stabOffset(s, s.start + t * s.speed);
+        const o = HC.stabOffset(s, HC.srcTime(s, t));
         if (o) keys.push([r3(t), Math.round(-o[0] * DW * crop * 10) / 10, Math.round(-o[1] * DH * crop * 10) / 10]);
       }
       stabKeys[i] = { crop: r3(crop), keys };
@@ -78,18 +82,51 @@
 
     const info = { ...HC.R.overlayInfo(0) };
     delete info.T;
+    // 標註：每 0.1 秒算一次在畫面上的位置（不含防抖的微小位移）；日夜對比的分隔線和文字
+    info.labels = []; info.splits = [];
+    shots.forEach((s, i) => {
+      const od = HC.outDur(s), c = HC.clip(s.clipId), vw = (c && c.w) || 1920, vh = (c && c.h) || 1080;
+      for (const lb of s.labels || []) {
+        const pts = [];
+        for (let t = 0; t <= od + 1e-6; t += 0.1) { const cr = HC.cropAt(s, t, vw, vh, W, H); pts.push(HC.toScreen(cr, lb.x, lb.y, vw, vh).map((v) => r3(v))); }
+        info.labels.push({ start: r3(starts[i]), dur: r3(od), text: lb.text, sub: lb.sub || "", side: lb.side || "ne", pts });
+      }
+      if (s.split) info.splits.push({ start: r3(starts[i]), dur: r3(od), labels: s.split.labels || ["白天", "夜晚"] });
+    });
     const fonts = [S.title.font, "Noto Serif TC"];
     const textForFonts = [S.title.main, S.title.sub, S.title.info, S.ending.main, S.ending.sub, ...shots.map((s) => s.text || "")].join("");
 
     const clipsHtml = shots.map((s, i) => {
-      const f = HC.filterCss(s.filter || S.look.filter, S.look.filterStr ?? 1);
+      const f = [HC.adjCss(s), HC.filterCss(s.filter || S.look.filter, S.look.filterStr ?? 1)].filter(Boolean).join(" ");
       let [fx, fy] = HC.focusOf(s).map((v) => r3(v * 100));
+      if (s.mode === "path") fx = fy = 50;
       if (s.mode === "panR" || s.mode === "panL") fx = 50;   // 平移時，移動方向用置中當縮放中心
       if (s.mode === "panU" || s.mode === "panD") fy = 50;
       // 目標點：縮放的中心（transform-origin），直式時也決定保留哪一塊（object-position）
+      const style = `object-position:${fx}% ${fy}%${f ? `;filter:${f}` : ""}`, src = fileOf.get(s.clipId);
+      // 速度曲線、定格：HyperFrames 的影片只能等速播放，所以切成好幾小段，每段用不同速度；定格用一段幾乎不動的影片
+      const segs = [], md = HC.moveDur(s);
+      if (s.mode === "move" && (s.ramp || s.freeze > 0)) {
+        const N = s.ramp ? 8 : 1;
+        for (let k = 0; k < N; k++) {
+          const a = md * k / N, b = md * (k + 1) / N, sa = HC.srcTime(s, a), sb = HC.srcTime(s, b);
+          segs.push({ id: `v${i}${N > 1 ? "_" + k : ""}`, start: starts[i] + a, dur: b - a, media: sa, rate: (sb - sa) / (b - a) });
+        }
+        if (s.freeze > 0) segs.push({ id: `v${i}_hold`, start: starts[i] + md, dur: s.freeze, media: Math.max(0, s.start + s.dur - 0.04), rate: 0.01 });
+      } else segs.push({ id: `v${i}`, start: starts[i], dur: HC.outDur(s), media: s.start, rate: s.speed });
+      const vids = segs.map((g) => `    <video id="${g.id}" class="clip" data-start="${r3(g.start)}" data-duration="${r3(g.dur)}" data-track-index="${i % 2}" data-media-start="${r3(g.media)}" data-playback-rate="${r3(g.rate)}" src="${src}" muted playsinline style="${style}"></video>`).join("\n");
+      const tf = HC.tempFill(s), od = HC.outDur(s);
+      // 日夜對比：第二支素材疊在同一個縮放容器裡，用 clip-path 從右邊掃進來
+      const sp = s.split && fileOf.get(s.split.clipId) ? `\n    <div id="sp${i}" style="position:absolute;inset:0;clip-path:inset(0 0 0 100%)"><video id="v${i}_b" class="clip" data-start="${r3(starts[i])}" data-duration="${r3(od)}" data-track-index="${2 + (i % 2)}" data-media-start="${r3(s.split.start)}" data-playback-rate="${s.speed}" src="${fileOf.get(s.split.clipId)}" muted playsinline style="${style}"></video></div>` : "";
+      // 子母畫面：固定在角落，不跟著縮放
+      let pip = "";
+      if (s.pip && fileOf.get(s.pip.clipId)) {
+        const r = HC.pipRect(W, H, s.pip);
+        pip = `\n  <div id="pp${i}" style="position:absolute;left:${r3(r.x)}px;top:${r3(r.y)}px;width:${r3(r.w)}px;height:${r3(r.h)}px;border:${r3(4 * r.u)}px solid #fff;border-radius:${r3(12 * r.u)}px;overflow:hidden;box-shadow:0 0 ${r3(24 * r.u)}px rgba(0,0,0,.5);opacity:0;z-index:3"><video id="v${i}_p" class="clip" data-start="${r3(starts[i])}" data-duration="${r3(od)}" data-track-index="${4 + (i % 2)}" data-media-start="${r3(s.pip.start)}" data-playback-rate="${s.speed}" src="${fileOf.get(s.pip.clipId)}" muted playsinline style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover${f ? `;filter:${f}` : ""}"></video></div>`;
+      }
       return `  <div class="frame" id="f${i}" style="z-index:${i + 1}"><div class="stab" id="s${i}"><div class="kb" id="k${i}" style="transform-origin:${fx}% ${fy}%">
-    <video id="v${i}" class="clip" data-start="${r3(starts[i])}" data-duration="${r3(HC.outDur(s))}" data-track-index="${i % 2}" data-media-start="${r3(s.start)}" data-playback-rate="${s.speed}" src="${fileOf.get(s.clipId)}" muted playsinline style="object-position:${fx}% ${fy}%${f ? `;filter:${f}` : ""}"></video>
-  </div></div></div>`;
+${vids}${sp}
+  </div></div>${tf ? `<div style="position:absolute;inset:0;background:${tf};mix-blend-mode:soft-light;pointer-events:none"></div>` : ""}${pip}</div>`;
     }).join("\n");
 
     const html = `<!doctype html>
@@ -126,7 +163,7 @@ ${ambTags}
 (${HC.effectsSource})();
 </script>
 <script>
-const SHOTS = ${JSON.stringify(shots.map((s, i) => ({ start: r3(starts[i]), dur: r3(HC.outDur(s)), kb: kenBurns(s), op: panPos(s), tr: i && s.tr && s.tr.type !== "cut" ? { type: s.tr.type, dur: r3(HC.trDur(i)) } : null })))};
+const SHOTS = ${JSON.stringify(shots.map((s, i) => ({ start: r3(starts[i]), dur: r3(HC.outDur(s)), kb: kenBurns(s), op: panPos(s), sp: !!(s.split && fileOf.get(s.split.clipId)), pp: !!(s.pip && fileOf.get(s.pip.clipId)), tr: i && s.tr && s.tr.type !== "cut" ? { type: s.tr.type, dur: r3(HC.trDur(i)) } : null })))};
 const STAB = ${JSON.stringify(stabKeys)};
 const INFO = ${JSON.stringify(info).replace(/</g, "\\u003c")};
 const FONTS = ${JSON.stringify(fonts)};
@@ -137,6 +174,8 @@ function build() {
   SHOTS.forEach((s, i) => {
     // 推近／平移
     if (s.kb) tl.fromTo("#k" + i, s.kb[0], { ...s.kb[1], duration: s.dur, ease: "sine.inOut" }, s.start);
+    if (s.sp) tl.fromTo("#sp" + i, { clipPath: "inset(0 0 0 100%)" }, { clipPath: "inset(0 0 0 50%)", duration: Math.max(0.5, s.dur - 1.6), ease: "sine.inOut" }, s.start + 0.6);
+    if (s.pp) { tl.fromTo("#pp" + i, { opacity: 0 }, { opacity: 1, duration: 0.5 }, s.start); tl.to("#pp" + i, { opacity: 0, duration: 0.5 }, s.start + s.dur - 0.5); }
     // 直式畫面的平移：素材比畫面寬很多，改成移動「保留哪一塊」
     if (s.op) tl.fromTo("#v" + i, { objectPosition: s.op[0] }, { objectPosition: s.op[1], duration: s.dur, ease: "sine.inOut" }, s.start);
     // 防抖：放大一點，再逐格位移抵銷晃動

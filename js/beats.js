@@ -38,6 +38,9 @@
       for (let c = 0; c < buf.numberOfChannels; c++) { const d = buf.getChannelData(c); for (let i = 0; i < L; i++) x[i] += d[i] / buf.numberOfChannels; }
       // onset：對數頻譜的正向變化量
       const frames = Math.max(0, Math.floor((L - N) / HOP)), env = new Float32Array(frames);
+      // 音量起伏（每 0.5 秒一點）：用來挑最好聽的一段
+      const half = Math.floor(SR / 2), e2 = [];
+      for (let i = 0; i + half <= L; i += half) { let s = 0; for (let j = i; j < i + half; j += 4) s += x[j] * x[j]; e2.push(Math.sqrt(s / (half / 4))); }
       const win = new Float32Array(N).map((_, i) => 0.5 - 0.5 * Math.cos(2 * Math.PI * i / N));
       let prev = new Float32Array(N / 2);
       const re = new Float32Array(N), im = new Float32Array(N);
@@ -87,11 +90,32 @@
         let s = 0; for (let i = ph; i < beats.length; i += 4) s += o[Math.round(beats[i] * SR / HOP - N / 2 / HOP)] || 0;
         if (s > pb) { pb = s; phase = ph; }
       }
-      info = { beats, bars: beats.filter((_, i) => i % 4 === phase), bpm: 60 * FPS / P, dur: buf.duration };
+      info = { beats, bars: beats.filter((_, i) => i % 4 === phase), bpm: 60 * FPS / P, dur: buf.duration, e2 };
       return info;
     } catch (e) { info = null; return null; }
   };
   HC.beatInfo = () => info;
+
+  /* 挑音樂最好聽的一段：影片長度 total 秒
+     - 開頭不要是很長的安靜前奏（前 4 秒的音量要夠）
+     - 從小節的第一拍、而且是音樂「變化」的地方開始
+     - 結尾盡量落在小節的開頭（樂句結束），而不是一句唱到一半 */
+  HC.bestMusicOffset = (total) => {
+    if (!info || !info.e2 || info.dur <= total + 2) return { off: 0, endOnBar: false };
+    const e = info.e2, med = e.slice().sort((a, b) => a - b)[e.length >> 1] || 1e-6;
+    const E = (t0, t1) => { let s = 0, n = 0; for (let k = Math.max(0, Math.floor(t0 * 2)); k < Math.min(e.length, Math.ceil(t1 * 2)); k++) { s += e[k]; n++; } return n ? s / n : 0; };
+    let best = { off: 0, sc: -1e9, endOnBar: false };
+    for (const b of [0, ...info.bars]) {
+      if (b + total > info.dur - 0.5) break;
+      const intro = Math.min(1.2, E(b, b + 4) / med);
+      const rise = Math.max(0, E(b, b + 2) - E(b - 2, b)) / med;
+      const end = b + total, nearBar = info.bars.some((x) => Math.abs(x - end) < 0.35);
+      const drop = Math.max(0, E(end - 2, end) - E(end, end + 2)) / med;
+      const sc = intro + 0.6 * Math.min(1, rise) + (nearBar ? 0.4 : 0) + 0.3 * Math.min(1, drop) - 0.004 * b;
+      if (sc > best.sc) best = { off: +b.toFixed(2), sc, endOnBar: nearBar };
+    }
+    return best;
+  };
   /* 拍點在成品時間軸上的位置（扣掉音樂起點） */
   HC.beatTimes = (bars) => {
     if (!info || !HC.state.music.url) return [];

@@ -71,7 +71,7 @@
     undo() { const h = store.hist[store.active] || []; if (!h.length) return false; HC.profile = upgrade(JSON.parse(h.pop())); HC.saveProfile(); return true; },
   };
   HC.resetProfile = () => { HC.snapshotProfile(); HC.profile = fresh(); HC.saveProfile(); };
-  HC.hasLearned = () => HC.profile.edits > 0 || HC.profile.refs.length > 0 || HC.profile.examples.length > 0;
+  HC.hasLearned = () => HC.profile.edits > 0 || HC.profile.refs.length > 0 || HC.profile.examples.length > 0 || Object.keys(HC.profile.choices || {}).length > 0;
   HC.importProfile = (o) => { if (!o || !o.style) throw new Error("bad"); HC.snapshotProfile(); HC.profile = upgrade(o); HC.saveProfile(); };
 
   /* ---------- 片段特徵 ---------- */
@@ -301,6 +301,20 @@
     if (P.examples.length > 600) P.examples = P.examples.slice(-600);
     train(); HC.saveProfile();
     return true;
+  };
+
+  /* ---------- 從「好幾個版本裡選一個」學習 ----------
+     選中的版本的節奏、鏡頭長短、速度、長度往學到的風格靠一點；也記下你選過哪一種 */
+  HC.learnFromChoice = (chosen, all) => {
+    const P = HC.profile, obs = styleOf(chosen.shots);
+    if (!obs) return;
+    HC.snapshotProfile();
+    const keep = { rhythm: obs.rhythm, longStill: obs.longStill, shortStill: obs.shortStill, moveSpeed: obs.moveSpeed, len: obs.len };
+    for (const [k, v] of Object.entries(keep)) if (v != null) P.style[k] = P.style[k] ? P.style[k] * 0.7 + v * 0.3 : v;
+    P.choices = P.choices || {};
+    P.choices[chosen.id] = (P.choices[chosen.id] || 0) + 1;
+    P.edits = (P.edits || 0) + 0;   // 不算一次「修改」，但 hasLearned 會因為 choices 成立
+    HC.saveProfile();
   };
 
   /* ---------- 從手動修改學習 ---------- */

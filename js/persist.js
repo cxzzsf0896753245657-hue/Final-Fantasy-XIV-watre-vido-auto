@@ -77,6 +77,9 @@
     load: () => get("proj", "current"),
     clear: () => { last = ""; return del("proj", "current"); },
     mark: (j) => { last = j; },
+    // 專案版本：手動存的快照（最多 20 個）
+    versions: async () => (await get("proj", "versions")) || [],
+    saveVersions: (list) => put("proj", "versions", list.slice(-20)),
     // 音樂庫的音樂只記編號，自己的音樂檔才存檔案本身
     saveMusic: (f, lib) => put("proj", "music", lib ? { name: f.name, lib } : { name: f.name, blob: f }),
     saveAmb: (key, name, blob) => put("proj", "amb:" + key, { name, blob }),

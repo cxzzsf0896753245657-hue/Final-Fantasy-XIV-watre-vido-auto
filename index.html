@@ -21,6 +21,8 @@
     <button class="btn icon" id="undoBtn" title="復原 (Ctrl+Z)" aria-label="復原">↶</button>
     <button class="btn icon" id="redoBtn" title="重做 (Ctrl+Shift+Z)" aria-label="重做">↷</button>
     <span class="sep"></span>
+    <button class="btn" id="tourBtn" title="使用導覽" aria-label="使用導覽">？</button>
+    <button class="btn" id="verBtn" title="把目前的剪輯存成一個版本，或回到之前的版本">版本</button>
     <button class="btn" id="saveBtn">儲存專案</button>
     <label class="btn" for="projIn">開啟專案</label>
     <input id="projIn" type="file" accept=".json,application/json" hidden>
@@ -88,8 +90,15 @@
             <option value="panU">向上平移</option>
             <option value="panD">向下平移</option>
             <option value="none">靜止</option>
+            <option value="path">自訂路徑（起點畫框 → 終點畫框）</option>
           </select>
         </label>
+        <div class="pathed single hidden" id="sPathRow">
+          <span>自訂路徑：選「起點」或「終點」，在預覽畫面上拖曳移動、滾輪（或下方滑桿）縮放</span>
+          <div class="seg" role="group" aria-label="編輯哪一個畫框"><button id="sKfA" aria-pressed="false">起點</button><button id="sKfB" aria-pressed="false">終點</button></div>
+          <label>這個畫框的放大 <output id="sKfZV"></output><input id="sKfZ" type="range" min="100" max="200" step="1"></label>
+          <button class="btn" id="sKfReset">重設路徑</button>
+        </div>
         <label>縮放幅度 <output id="sZoomV"></output><input id="sZoom" type="range" min="0" max="35" step="1"></label>
         <div class="focus single" id="sFocusRow">
           <span>推近／縮放的目標點 <output id="sFocusV"></output></span>
@@ -101,6 +110,21 @@
             <option value="1">1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2×</option>
           </select>
         </label>
+        <div class="row2 moveonly" id="sRampRow">
+          <label>速度曲線<select id="sRamp"><option value="">等速</option><option value="ease">頭尾慢、中間快</option><option value="in">慢慢加速</option><option value="out">慢慢減速</option></select></label>
+          <label>結尾定格（秒）<input id="sFreeze" type="number" min="0" max="5" step="0.5"></label>
+        </div>
+        <details class="adj" id="sAdjBox"><summary>調色（亮度、對比、飽和度、色溫）</summary>
+          <label>亮度 <output id="sAdjBV"></output><input id="sAdjB" type="range" min="-100" max="100" step="5" data-adj="b"></label>
+          <label>對比 <output id="sAdjCV"></output><input id="sAdjC" type="range" min="-100" max="100" step="5" data-adj="c"></label>
+          <label>飽和度 <output id="sAdjSV"></output><input id="sAdjS" type="range" min="-100" max="100" step="5" data-adj="s"></label>
+          <label>色溫（冷 ↔ 暖）<output id="sAdjTV"></output><input id="sAdjT" type="range" min="-100" max="100" step="5" data-adj="t"></label>
+          <div class="btnrow"><button class="btn" id="sAdjReset">重設調色</button><button class="btn" id="autoColorBtn" title="分析每個鏡頭的亮度和色調，讓同一個時段（白天／夜晚）的鏡頭顏色一致">自動配色（全部鏡頭）</button></div>
+        </details>
+        <div class="btnrow">
+          <button class="btn" id="sCopyFx" title="Alt+C">複製效果</button>
+          <button class="btn" id="sPasteFx" title="Alt+V：貼到所有選取的鏡頭" disabled>貼上效果</button>
+        </div>
         <label class="check"><input id="sStab" type="checkbox"> 防抖</label>
         <label id="sStabRow">防抖強度 <output id="sStabV"></output><input id="sStabStr" type="range" min="0" max="100" step="5"></label>
         <div class="row2">
@@ -109,6 +133,17 @@
         </div>
         <label>這個鏡頭的濾鏡<select id="sFilter"></select></label>
         <label class="single">畫面文字（選填）<input id="sText" type="text" placeholder="例如：夜、臥室"></label>
+        <details class="adj single" id="sLabBox"><summary>標註（家具、區域）<span id="sLabN"></span></summary>
+          <p class="hint">在預覽畫面上點一個位置，加上箭頭和文字。推近、平移時標註會跟著那個位置移動。</p>
+          <div id="sLabList"></div>
+          <button class="btn" id="sLabAdd" aria-pressed="false">＋ 新增標註（點預覽畫面上的位置）</button>
+        </details>
+        <details class="adj single" id="sCompBox"><summary>畫面合成（日夜對比、子母畫面）</summary>
+          <label>日夜對比：右半邊換成<select id="sSplit"></select></label>
+          <label>子母畫面：小視窗放<select id="sPip"></select></label>
+          <div class="row2" id="sPipOpt"><label>小視窗位置<select id="sPipCorner"><option value="br">右下</option><option value="bl">左下</option><option value="tr">右上</option><option value="tl">左上</option></select></label><label>大小 <output id="sPipSizeV"></output><input id="sPipSize" type="range" min="15" max="45" step="1"></label></div>
+          <button class="btn" id="dnAuto" title="找一組角度最像的白天、夜晚鏡頭，在後面加一個日夜對比鏡頭">自動找一組日夜對比</button>
+        </details>
         <div class="btnrow single">
           <button class="btn" id="sHere">從播放位置開始</button>
           <button class="btn" id="sSplit" title="快捷鍵 S">在播放位置分割</button>
@@ -143,7 +178,13 @@
     </div>
 
     <div class="pane" id="pane-auto">
+      <div class="btnrow">
+        <button class="btn accent" id="varBtn" title="用同一批素材剪出三種風格，選一個；你選的會被學起來">做 3 個版本讓我挑</button>
+        <button class="btn" id="shortBtn" title="從目前的時間軸挑最好的鏡頭，做成直式 45 秒的版本（原本的會先存成一個版本）">產生短影音版</button>
+      </div>
+      <div id="variants" class="variants hidden" aria-live="polite"></div>
       <label>目標長度 <output id="aLenV"></output><input id="aLen" type="range" min="30" max="300" step="5" value="120"></label>
+      <label class="check"><input id="aFitMusic" type="checkbox" checked> 長度配合背景音樂（不超過音樂長度）</label>
       <label>節奏 <output id="aRhyV"></output><input id="aRhy" type="range" min="0" max="100" value="40"></label>
       <label>原運鏡播放速度
         <select id="aSpeed"><option value="0.6">0.6×（更慢）</option><option value="0.8" selected>0.8×</option><option value="1">1×（原速）</option></select>
@@ -159,6 +200,8 @@
       <label class="check"><input id="aCover" type="checkbox" checked> 每支素材至少用一個鏡頭</label>
       <label class="check"><input id="aLateral" type="checkbox" checked> 優先挑橫向移動的運鏡</label>
       <label class="check"><input id="aBeat" type="checkbox" checked> 剪接點對齊音樂拍點（有選背景音樂時）</label>
+      <label class="check"><input id="aDedupe" type="checkbox" checked> 去掉角度幾乎一樣的重複畫面</label>
+      <label class="check"><input id="aDayNight" type="checkbox" checked> 白天的場景排前面、夜晚排後面</label>
       <label>拍攝時間相隔超過幾分鐘，就算不同場景<input id="aGap" type="number" value="8" min="0" step="1"></label>
       <label>畫面換場景的判斷靈敏度 <output id="aSceneV"></output><input id="aSceneLook" type="range" min="0" max="100" step="5" value="50"></label>
       <p class="hint">例如庭園 → 室內。分錯了可以在左邊素材區手動「分場景」或「併回」。</p>
@@ -210,6 +253,13 @@
       <label>片尾文字<input id="eMain" type="text" value="Thank you for watching"></label>
       <label>片尾副標<input id="eSub" type="text" placeholder="例如：攝影・裝潢 ○○○"></label>
       <label>片尾顯示秒數<input id="eDur" type="number" value="4" step="0.5" min="2"></label>
+      <h3 class="sec">浮水印・簽名</h3>
+      <label class="check"><input id="wOn" type="checkbox"> 整支影片都顯示</label>
+      <div class="seg" role="group" aria-label="浮水印種類"><button id="wKindText" aria-pressed="true">文字</button><button id="wKindImg" aria-pressed="false">圖片（Logo）</button></div>
+      <label id="wTextRow">文字<input id="wText" type="text" placeholder="例如：@你的名字・Mana 伺服器"></label>
+      <div id="wImgRow" class="hidden"><label class="btn" for="wImgIn">選擇 Logo 圖片（PNG 透明背景最好）</label><input id="wImgIn" type="file" accept="image/*" hidden><p class="hint" id="wImgName"></p></div>
+      <div class="row2"><label>位置<select id="wCorner"><option value="br">右下</option><option value="bl">左下</option><option value="tr">右上</option><option value="tl">左上</option></select></label><label>大小 <output id="wSizeV"></output><input id="wSize" type="range" min="4" max="30" step="1"></label></div>
+      <label>不透明度 <output id="wOpV"></output><input id="wOp" type="range" min="20" max="100" step="5"></label>
     </div>
 
     <div class="pane" id="pane-look">
@@ -226,6 +276,7 @@
     </div>
 
     <div class="pane" id="pane-music">
+      <div class="rec" id="recBox"><span id="recText">剪好之後會依畫面推薦音樂和環境音</span><button class="btn" id="recBtn" disabled>套用推薦</button></div>
       <h3 class="sub">背景音樂</h3>
       <div class="btnrow"><button class="btn" id="libMusicBtn">從音樂庫挑</button><label class="btn" for="musicIn">用自己的音樂檔</label></div>
       <input id="musicIn" type="file" accept="audio/*" hidden>
@@ -233,6 +284,7 @@
       <label>音量 <output id="mVolV"></output><input id="mVol" type="range" min="0" max="100" value="80"></label>
       <label>從音樂的第幾秒開始<input id="mOff" type="number" value="0" step="0.5" min="0"></label>
       <label>結尾淡出（秒）<input id="mFade" type="number" value="3" step="0.5" min="0"></label>
+      <label class="check"><input id="mBest" type="checkbox" checked> 自動挑音樂最好聽的一段（避開長前奏，結尾落在樂句結束）</label>
       <p class="hint" id="mBeat"></p>
       <button class="btn" id="mSnap" disabled>把剪接點對齊拍點</button>
       <button class="btn" id="mClear">移除音樂</button>
@@ -279,17 +331,25 @@
     </div>
 
     <div class="pane" id="pane-out">
+      <label>平台預設<select id="oPreset"><option value="">自訂</option><option value="yt">YouTube 1080p（16:9）</option><option value="yt4k">YouTube 4K（16:9）</option><option value="shorts">Shorts／Reels／TikTok（9:16，60 秒內）</option><option value="igsq">Instagram 貼文 方形（1:1）</option><option value="ig45">Instagram 貼文 直式（4:5）</option></select></label>
+      <p class="hint" id="oPresetHint"></p>
       <label>匯出方式<select id="oMode"><option value="frames">逐格輸出（不掉格，較慢）</option><option value="realtime">即時錄製（較快，電腦忙時可能掉格）</option></select></label>
       <label>每秒格數<select id="oFps"><option value="30">30 fps</option><option value="60">60 fps</option></select></label>
-      <label>畫面比例<select id="oAspect"><option value="16:9">橫式 16:9（YouTube）</option><option value="9:16">直式 9:16（Shorts、Reels、TikTok）</option></select></label>
+      <label>畫面比例<select id="oAspect"><option value="16:9">橫式 16:9（YouTube）</option><option value="9:16">直式 9:16（Shorts、Reels、TikTok）</option><option value="1:1">方形 1:1（Instagram）</option><option value="4:5">直式 4:5（Instagram）</option></select></label>
       <p class="hint" id="oAspectHint"></p>
-      <label>解析度<select id="oRes"><option value="1080">1080p</option><option value="720">720p</option></select></label>
-      <label>畫質<select id="oRate"><option value="16">高（約 16 Mbps）</option><option value="10" selected>標準（約 10 Mbps）</option><option value="5">小檔（約 5 Mbps）</option></select></label>
+      <label>解析度<select id="oRes"><option value="2160">4K（2160p，素材要夠清楚才有差）</option><option value="1080">1080p</option><option value="720">720p</option></select></label>
+      <label>畫質<select id="oRate"><option value="40">4K 用（約 40 Mbps）</option><option value="16">高（約 16 Mbps）</option><option value="10" selected>標準（約 10 Mbps）</option><option value="5">小檔（約 5 Mbps）</option></select></label>
       <label>片頭淡入（秒）<input id="oFi" type="number" value="1.5" step="0.5" min="0"></label>
       <label>片尾淡出（秒）<input id="oFo" type="number" value="2.5" step="0.5" min="0"></label>
       <p class="hint" id="oFmt"></p>
       <p class="hint" id="oModeHint"></p>
       <button class="btn accent wide" id="exportBtn2" disabled>匯出影片</button>
+      <h3 class="sec">封面圖和章節</h3>
+      <div class="btnrow"><button class="btn" id="thumbBtn" disabled>產生封面圖</button><button class="btn" id="chapBtn" disabled>產生 YouTube 章節</button></div>
+      <div id="thumbs" class="thumbs hidden"></div>
+      <h3 class="sec">預覽</h3>
+      <label class="check"><input id="oProxy" type="checkbox"> 流暢預覽：先做一份低畫質的預覽檔（素材多、電腦慢時用；匯出還是用原始畫質）</label>
+      <p class="hint" id="oProxyHint"></p>
       <h3 class="sec">HyperFrames 專案（最高畫質）</h3>
       <p class="hint">匯出成 HyperFrames 專案，在你的電腦上用 <code>npx hyperframes render</code> 逐格渲染：不會掉格、畫質最好，也能在 HyperFrames Studio 繼續編輯。需要安裝 Node.js 22 以上和 FFmpeg，步驟寫在專案裡的 README.md。</p>
       <label class="check"><input id="hfClips" type="checkbox" checked> 把素材和音樂一起打包（檔案會比較大）</label>
@@ -302,7 +362,7 @@
       <h2>時間軸</h2><span id="tlInfo" class="muted"></span>
       <details class="keys"><summary>快捷鍵</summary>
         <p><kbd>空白</kbd>／<kbd>K</kbd> 播放暫停 ・ <kbd>J</kbd> <kbd>L</kbd> 倒退／前進 2 秒 ・ <kbd>←</kbd> <kbd>→</kbd> 逐格（加 <kbd>Shift</kbd> 跳 1 秒）・ <kbd>Home</kbd> <kbd>End</kbd> 開頭／結尾<br>
-        <kbd>S</kbd> 分割 ・ <kbd>Delete</kbd> 刪除 ・ <kbd>Ctrl</kbd>+<kbd>D</kbd> 複製 ・ <kbd>Ctrl</kbd>+<kbd>A</kbd> 全選 ・ <kbd>Ctrl</kbd>/<kbd>Shift</kbd>+點 多選 ・ <kbd>Ctrl</kbd>+<kbd>Z</kbd> 復原<br>
+        <kbd>S</kbd> 分割 ・ <kbd>Delete</kbd> 刪除 ・ <kbd>Ctrl</kbd>+<kbd>D</kbd> 複製 ・ <kbd>Ctrl</kbd>+<kbd>A</kbd> 全選 ・ <kbd>Ctrl</kbd>/<kbd>Shift</kbd>+點 多選 ・ <kbd>Ctrl</kbd>+<kbd>Z</kbd> 復原 ・ <kbd>Alt</kbd>+<kbd>C</kbd>／<kbd>V</kbd> 複製／貼上效果<br>
         拖鏡頭左右邊緣可以修剪長度，會自動吸附到播放位置和音樂拍點。</p></details>
       <label class="zoom">縮放<input id="tlZoom" type="range" min="4" max="40" value="12" aria-label="時間軸縮放"></label>
     </div>
@@ -327,6 +387,7 @@
 <script src="js/hyperframes.js"></script>
 <script src="js/beats.js"></script>
 <script src="js/library.js"></script>
+<script src="js/color.js"></script>
 <script src="js/auto.js"></script>
 <script src="js/render.js"></script>
 <script src="js/vendor/mp4-muxer.min.js"></script>

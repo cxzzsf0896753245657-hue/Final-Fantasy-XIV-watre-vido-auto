@@ -18,6 +18,7 @@
     try { lib = await (await fetch("audio/library.json")).json(); } catch (e) { lib = { cats: [], items: [] }; }
     return lib;
   };
+  HC.libCatName = (id) => { const c = lib && lib.cats.find((x) => x.id === id); return c ? c.name : id; };
   HC.libItem = (id) => lib && lib.items.find((x) => x.id === id);
   const libUrl = (it) => "audio/" + it.file;
   async function libFile(it) { const b = await (await fetch(libUrl(it))).blob(); return new File([b], (it.zh || it.title) + "." + it.file.split(".").pop(), { type: b.type || "audio/webm" }); }
@@ -56,10 +57,11 @@
     if (!lib) return;
     // 你常用的分類排前面（從「學習」記下來的）
     const used = ((HC.profile && HC.profile.look && HC.profile.look[kind === "music" ? "music" : "amb"]) || {});
-    const cats = lib.cats.filter((c) => c.kind === kind).sort((a, b) => (used[b.id] || 0) - (used[a.id] || 0));
+    const rec = HC.state.shots.length ? HC.recommendAudio() : { music: [], amb: [] }, recSet = new Set(kind === "music" ? rec.music : rec.amb);
+    const cats = lib.cats.filter((c) => c.kind === kind).sort((a, b) => (recSet.has(b.id) - recSet.has(a.id)) || (used[b.id] || 0) - (used[a.id] || 0));
     if (!cats.some((c) => c.id === cat)) cat = "";
     const count = (id) => lib.items.filter((x) => x.cat === id).length;
-    $("libCats").innerHTML = `<button aria-pressed="${!cat}" data-cat="">全部</button>` + cats.map((c) => `<button aria-pressed="${cat === c.id}" data-cat="${c.id}" ${used[c.id] ? 'title="你常用的分類"' : ""}>${used[c.id] ? "★ " : ""}${esc(c.name)}<small>${count(c.id)}</small></button>`).join("");
+    $("libCats").innerHTML = `<button aria-pressed="${!cat}" data-cat="">全部</button>` + cats.map((c) => `<button aria-pressed="${cat === c.id}" data-cat="${c.id}" ${used[c.id] ? 'title="你常用的分類"' : ""}>${recSet.has(c.id) ? "推薦・" : used[c.id] ? "★ " : ""}${esc(c.name)}<small>${count(c.id)}</small></button>`).join("");
     const ql = q.trim().toLowerCase();
     // 有輸入搜尋時搜這一類（音樂／音效）的全部分類
     const items = lib.items.filter((x) => cats.some((c) => c.id === x.cat) && (ql || !cat || x.cat === cat) && (!ql || (x.title + " " + x.creator + " " + x.zh + " " + (lib.cats.find((c) => c.id === x.cat) || {}).name).toLowerCase().includes(ql)));
@@ -127,6 +129,38 @@
       const f = e.target.files[0]; e.target.value = ""; if (!f) return;
       await HC.addAmb({ blob: f, name: f.name.replace(/\.[^.]+$/, "") });
     });
+  };
+
+  /* ---------- 依畫面推薦音樂和環境音 ----------
+     看時間軸上的場景類型（庭園／室內）和白天／夜晚；你常用的分類優先 */
+  HC.recommendAudio = () => {
+    const S = HC.state, cnt = {};
+    for (const s of S.shots) { const c = HC.clip(s.clipId); if (!c) continue; const k = (HC.clipType(s.clipId) || "garden") + ":" + (HC.shotTod ? HC.shotTod(s) : "day"); cnt[k] = (cnt[k] || 0) + HC.outDur(s); }
+    const top = Object.entries(cnt).sort((a, b) => b[1] - a[1]).map(([k]) => k);
+    const amb = [], why = [];
+    const add = (arr, ...xs) => { for (const x of xs) if (!arr.includes(x)) arr.push(x); };
+    for (const k of top.slice(0, 2)) {
+      const [type, tod] = k.split(":");
+      if (type === "indoor") { add(amb, tod === "night" ? "fire" : "indoor", "fire"); why.push(tod === "night" ? "室內夜晚 → 壁爐" : "室內 → 生活環境音"); }
+      else if (tod === "night") { add(amb, "night", "water"); why.push("夜晚庭園 → 蟲鳴、流水"); }
+      else { add(amb, "birds", "water"); why.push("白天庭園 → 鳥鳴、流水"); }
+    }
+    const fav = HC.profile && HC.profile.look && HC.profile.look.music ? Object.entries(HC.profile.look.music).sort((a, b) => b[1] - a[1]).map(([k]) => k) : [];
+    const night = top[0] && top[0].endsWith("night"), short = HC.timeline().total < 75;
+    const music = [...fav, ...(short ? ["light", "fantasy"] : night ? ["piano", "ambient", "musicbox"] : ["orchestral", "piano", "guitar"])].filter((v, i, a) => a.indexOf(v) === i).slice(0, 3);
+    if (fav.length) why.unshift("音樂：照你常用的分類"); else why.unshift(short ? "影片短 → 輕快的音樂" : night ? "夜晚為主 → 鋼琴、氛圍" : "白天為主 → 管弦樂、鋼琴");
+    return { music, amb: amb.slice(0, 2), why };
+  };
+  /* 套用推薦：第一個音樂分類裡還沒用過的第一首，加上 1～2 層環境音（小聲一點） */
+  HC.applyRecommendation = async () => {
+    await HC.loadLibrary();
+    const r = HC.recommendAudio(), S = HC.state;
+    const it = lib.items.find((x) => x.cat === r.music[0] && x.id !== S.music.lib) || lib.items.find((x) => r.music.includes(x.cat));
+    if (it) await api.setMusic(await libFile(it), true, it.id);
+    for (const a of [...S.amb]) if (a.lib) removeAmb(a.key);
+    for (const cat of r.amb) { const x = lib.items.find((y) => y.cat === cat); if (x) await HC.addAmb({ blob: await (await fetch(libUrl(x))).blob(), name: x.zh || x.title, lib: x.id, vol: 0.35, quiet: true, ext: x.file.split(".").pop() }); }
+    renderAmb(); render();
+    return { music: it, amb: S.amb.map((a) => a.name), why: r.why };
   };
 
   /* 存檔／還原用 */

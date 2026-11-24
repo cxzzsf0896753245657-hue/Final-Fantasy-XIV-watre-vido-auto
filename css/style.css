@@ -241,7 +241,7 @@ kbd{font:inherit;font-size:11px;padding:1px 5px;border:1px solid var(--line);bor
 .scene small{white-space:nowrap}
 .scene button{white-space:nowrap}
 .scene{flex-wrap:wrap}
-.screen.vertical{aspect-ratio:9/16;width:auto;height:calc(100vh - 330px);max-width:100%;max-height:none}
+.screen.vertical{aspect-ratio:var(--ar,9/16);width:auto;height:calc(100vh - 330px);max-width:100%;max-height:none}
 @media (max-width:900px){.screen.vertical{height:70vh}}
 /* 音樂與音效庫 */
 h3.sub{margin:6px 0 0;font-size:13px;font-weight:600;color:var(--ink)}
@@ -268,3 +268,63 @@ h3.sub small{font-weight:400;margin-left:6px}
 .amb{display:grid;grid-template-columns:minmax(0,1fr) 90px 34px;align-items:center;gap:8px;font-size:13px;padding:4px 0}
 .amb span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .amb button{font:inherit;width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:none;color:var(--mute);cursor:pointer}
+
+/* 自訂路徑、調色 */
+.pathed{display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:8px;background:var(--panel2);font-size:13px}
+.seg button[aria-pressed="true"]{background:var(--accent);color:#111}
+.stage.kfedit canvas{cursor:grab}
+.stage.kfedit canvas:active{cursor:grabbing}
+details.adj{font-size:13px}
+details.adj summary{cursor:pointer;color:var(--ink);padding:4px 0}
+details.adj[open]{display:flex;flex-direction:column;gap:8px}
+.form .moveonly.hidden{display:none}
+.scene .tod{font-size:12px;padding:1px 6px;margin-left:auto}
+.scene .tod + select{margin-left:4px}
+
+.lab{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 64px 30px;gap:6px;align-items:center;margin-bottom:6px}
+.lab input,.lab select{font-size:13px;padding:6px}
+.lab button{font:inherit;width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:none;color:var(--mute);cursor:pointer}
+#sLabAdd[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+
+/* 版本挑選、推薦 */
+.variants{display:grid;gap:10px}
+.vcard{border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--panel2);display:grid;gap:8px}
+.vcard.on{border-color:var(--accent)}
+.vcard h4{margin:0;font-size:14px}
+.vcard p{margin:0;font-size:12px;color:var(--mute)}
+.vstrip{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:3px}
+.vstrip i{aspect-ratio:16/9;background:#000 center/cover;border-radius:3px}
+.rec{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;background:var(--panel2);font-size:12px;color:var(--mute)}
+.rec span{flex:1;line-height:1.5}
+.verlist{display:flex;flex-direction:column;gap:6px;width:min(560px,90vw);max-height:60vh;overflow:auto}
+.ver{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center;padding:8px 10px;border-radius:8px;background:var(--panel2);font-size:13px}
+.ver small{display:block;color:var(--mute)}
+
+.thumbs{display:grid;gap:10px}
+.thumbs .tc{display:grid;gap:6px}
+.thumbs canvas{width:100%;height:auto;border-radius:8px;border:1px solid var(--line)}
+
+/* 導覽 */
+.tour{position:fixed;inset:0;z-index:20;pointer-events:none}
+.tour .hole{position:fixed;border-radius:10px;box-shadow:0 0 0 9999px rgba(0,0,0,.62);border:2px solid var(--accent);transition:all .25s ease;pointer-events:none}
+.tour .card{position:fixed;width:min(340px,calc(100vw - 24px));background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;box-shadow:0 12px 40px rgba(0,0,0,.5);pointer-events:auto;display:grid;gap:10px}
+.tour .card h4{margin:0;font-size:15px}
+.tour .card p{margin:0;font-size:13px;line-height:1.6;color:var(--mute)}
+.tour .card .btnrow{justify-content:space-between}
+@media (prefers-reduced-motion:reduce){.tour .hole{transition:none}}
+
+/* 手機 */
+@media (max-width:600px){
+  .top{flex-wrap:wrap;gap:8px}
+  .actions{width:100%;overflow-x:auto;flex-wrap:nowrap;padding-bottom:4px;-webkit-overflow-scrolling:touch}
+  .actions .btn,.actions label{flex:none}
+  .tabs{flex-wrap:nowrap;overflow-x:auto}
+  .tabs button{flex:0 0 auto;padding:8px 14px}
+  .shot .h{width:16px}
+  .shot .h::after{opacity:1}
+  .screen.vertical{height:58vh}
+  .transport{flex-wrap:wrap}
+  .lab{grid-template-columns:minmax(0,1fr) 64px 30px}
+  .lab input[data-f="sub"]{grid-column:1 / -1;order:5}
+  details.keys{display:none}
+}
