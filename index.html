@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@400;600&family=LXGW+WenKai+TC&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
 </head>
 <body>
 <header class="top">
@@ -54,7 +55,9 @@
     <nav class="tabs" role="tablist">
       <button role="tab" data-tab="shot" class="on">鏡頭</button>
       <button role="tab" data-tab="auto">自動剪輯</button>
-      <button role="tab" data-tab="title">標題</button>
+      <button role="tab" data-tab="trans">轉場</button>
+      <button role="tab" data-tab="title">開頭片尾</button>
+      <button role="tab" data-tab="look">濾鏡特效</button>
       <button role="tab" data-tab="music">音樂</button>
       <button role="tab" data-tab="learn">學習</button>
       <button role="tab" data-tab="out">匯出</button>
@@ -89,7 +92,11 @@
         </label>
         <label class="check"><input id="sStab" type="checkbox"> 防抖</label>
         <label id="sStabRow">防抖強度 <output id="sStabV"></output><input id="sStabStr" type="range" min="0" max="100" step="5"></label>
-        <label class="check"><input id="sDip" type="checkbox"> 這個鏡頭前用黑場轉場</label>
+        <div class="row2">
+          <label>進場轉場<select id="sTr"></select></label>
+          <label>轉場秒數<input id="sTrDur" type="number" step="0.1" min="0.1" max="3"></label>
+        </div>
+        <label>這個鏡頭的濾鏡<select id="sFilter"></select></label>
         <label>畫面文字（選填）<input id="sText" type="text" placeholder="例如：夜、臥室"></label>
         <div class="btnrow">
           <button class="btn" id="sHere">從播放位置開始</button>
@@ -139,27 +146,63 @@
       <label>防抖強度 <output id="aStabV"></output><input id="aStabStr" type="range" min="0" max="100" step="5" value="60"></label>
       <label class="check"><input id="aCover" type="checkbox" checked> 每支素材至少用一個鏡頭</label>
       <label class="check"><input id="aLateral" type="checkbox" checked> 優先挑橫向移動的運鏡</label>
-      <label>拍攝時間相隔超過幾分鐘，就加黑場分段<input id="aGap" type="number" value="8" min="0" step="1"></label>
+      <label>拍攝時間相隔超過幾分鐘，就算不同場景<input id="aGap" type="number" value="8" min="0" step="1"></label>
+      <label>鏡頭順序
+        <select id="aOrder"><option value="learn">依學到的習慣</option><option value="time">照拍攝時間</option><option value="rhythm">靜止、運鏡交錯</option></select>
+      </label>
+      <label>轉場方式
+        <select id="aTrMode"><option value="learn">依學到的習慣</option><option value="smart">換場景用黑場，其他直切</option><option value="mix">多種轉場混合</option><option value="all">全部用同一種</option></select>
+      </label>
+      <label id="aTrTypeRow" class="hidden">全部使用<select id="aTrType"></select></label>
       <button class="btn primary wide" id="autoBtn2" disabled>重新自動剪輯</button>
       <p class="hint">自動剪輯會取代目前的時間軸，可以按「復原」回到上一版。</p>
     </div>
 
+    <div class="pane" id="pane-trans">
+      <p class="hint">點一個轉場，再套用到選取的鏡頭（套在鏡頭「進場」的地方）或全部鏡頭。</p>
+      <div class="tiles" id="trTiles"></div>
+      <label>轉場秒數 <output id="trDurV"></output><input id="trDur" type="range" min="0.2" max="2.5" step="0.1" value="0.8"></label>
+      <div class="btnrow">
+        <button class="btn primary" id="trApply">套用到選取的鏡頭</button>
+        <button class="btn" id="trAll">套用到全部</button>
+      </div>
+      <button class="btn wide" id="trScenes">只套用在換場景的地方</button>
+    </div>
+
     <div class="pane" id="pane-title">
-      <label class="check"><input id="tShow" type="checkbox" checked> 顯示開頭標題</label>
+      <h3 class="sec">開頭</h3>
+      <div class="tiles" id="tTiles"></div>
       <label>主標題<input id="tMain" type="text" value="FFXIV HOUSING"></label>
       <label>副標題<input id="tSub" type="text" value="庭園 ・ Garden"></label>
+      <label>第三行（伺服器、地址…）<input id="tInfo" type="text" placeholder="例如：Mana ・ 白銀鄉 12 區 3 號"></label>
       <label>字體
         <select id="tFont"><option value="Noto Serif TC">明體（Noto Serif TC）</option><option value="Noto Sans TC">黑體（Noto Sans TC）</option><option value="LXGW WenKai TC">楷體（霞鶩文楷）</option></select>
       </label>
       <div class="row2">
         <label>大小<input id="tSize" type="number" value="84" min="24" max="200"></label>
-        <label>顏色<input id="tColor" type="color" value="#ffffff"></label>
+        <label>顯示秒數<input id="tDur" type="number" value="5.5" step="0.5" min="2"></label>
       </div>
-      <label>位置
+      <div class="row2">
+        <label>文字顏色<input id="tColor" type="color" value="#ffffff"></label>
+        <label>強調色<input id="tAccent" type="color" value="#e9c46a"></label>
+      </div>
+      <label>位置（部分模板有固定位置）
         <select id="tPos"><option value="center">畫面中央</option><option value="lowleft">左下角</option><option value="top">上方</option></select>
       </label>
       <label class="check"><input id="tLine" type="checkbox" checked> 標題下加細線</label>
-      <label>顯示秒數<input id="tDur" type="number" value="5.5" step="0.5" min="2"></label>
+      <h3 class="sec">片尾</h3>
+      <label>片尾樣式<select id="eTpl"></select></label>
+      <label>片尾文字<input id="eMain" type="text" value="Thank you for watching"></label>
+      <label>片尾副標<input id="eSub" type="text" placeholder="例如：攝影・裝潢 ○○○"></label>
+      <label>片尾顯示秒數<input id="eDur" type="number" value="4" step="0.5" min="2"></label>
+    </div>
+
+    <div class="pane" id="pane-look">
+      <h3 class="sec">濾鏡（整支影片）</h3>
+      <div class="tiles" id="fTiles"></div>
+      <p class="hint" id="fHint"></p>
+      <h3 class="sec">特效</h3>
+      <div id="fxList" class="form"></div>
     </div>
 
     <div class="pane" id="pane-music">
@@ -197,6 +240,10 @@
       <p class="hint" id="oFmt"></p>
       <p class="hint">匯出是即時錄製：2 分鐘的影片要錄 2 分鐘。錄製時請讓這個分頁保持在最前面。</p>
       <button class="btn accent wide" id="exportBtn2" disabled>匯出影片</button>
+      <h3 class="sec">HyperFrames 專案（最高畫質）</h3>
+      <p class="hint">匯出成 HyperFrames 專案，在你的電腦上用 <code>npx hyperframes render</code> 逐格渲染：不會掉格、畫質最好，也能在 HyperFrames Studio 繼續編輯。需要安裝 Node.js 22 以上和 FFmpeg，步驟寫在專案裡的 README.md。</p>
+      <label class="check"><input id="hfClips" type="checkbox" checked> 把素材和音樂一起打包（檔案會比較大）</label>
+      <button class="btn wide" id="hfBtn" disabled>下載 HyperFrames 專案（.zip）</button>
     </div>
   </aside>
 
@@ -221,6 +268,8 @@
 <script src="js/analyze.js"></script>
 <script src="js/stab.js"></script>
 <script src="js/learn.js"></script>
+<script src="js/effects.js"></script>
+<script src="js/hyperframes.js"></script>
 <script src="js/auto.js"></script>
 <script src="js/render.js"></script>
 <script src="js/ui.js"></script>

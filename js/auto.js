@@ -112,6 +112,7 @@
       T.longStill = +HC.clamp(L.longStill, 3, 12).toFixed(1); T.shortStill = +HC.clamp(L.shortStill, 1.5, 4).toFixed(1); T.maxMove = Math.round(HC.clamp(L.maxMove, 4, 20));
       opt.rhythm = +HC.clamp(L.rhythm, 0, 1).toFixed(2); opt.zoom = +HC.clamp(L.zoom, 0.04, 0.3).toFixed(2);
       opt.speed = [0.6, 0.8, 1].reduce((b, v) => Math.abs(v - L.moveSpeed) < Math.abs(b - L.moveSpeed) ? v : b, 0.8);
+      if (L.len) opt.len = Math.round(HC.clamp(L.len, 30, 300) / 5) * 5;
     }
     HC.sortClips();
     const clips = S.clips.filter((c) => c.ana);
@@ -137,9 +138,12 @@
         if (mine.length) { picked.push(mine[0]); total += nominal(mine[0]); }
       }
     }
+    // 每支素材最多用幾個鏡頭（學到你通常一支素材用幾個）
+    const cap = L && L.perClip ? Math.max(1, Math.ceil(L.perClip * 1.5)) : 99;
+    const count = (id) => picked.filter((p) => p.clipId === id).length;
     for (const x of cands.slice().sort((p, q) => q.score - p.score)) {
       if (total >= opt.len) break;
-      if (picked.includes(x) || clash(x)) continue;
+      if (picked.includes(x) || clash(x) || count(x.clipId) >= cap) continue;
       picked.push(x); total += nominal(x);
     }
     picked.sort((p, q) => (order.get(p.clipId) - order.get(q.clipId)) || (p.a - q.a));
@@ -171,24 +175,84 @@
       let mode = idx === 0 ? "in" : nextMode();
       shots.push(mk(x.clipId, a, len, mode, short ? Math.min(0.35, opt.zoom * 1.3) : opt.zoom, 1));
     });
-    // 拍攝時間相隔很久的段落之間（例如白天換到晚上）加黑場
-    for (let i = 1; i < shots.length; i++) {
-      const p = HC.clip(shots[i - 1].clipId), c = HC.clip(shots[i].clipId);
-      if (opt.gap > 0 && p !== c && Math.abs(c.time - p.time) > opt.gap * 60000) shots[i].dip = true;
-    }
-    // 學到的黑場頻率：在拍攝時間相隔最久的地方補上黑場
-    if (L && L.dipRatio > 0.05) {
-      const want = Math.round(L.dipRatio * (shots.length - 1)) - shots.filter((s) => s.dip).length;
-      const gaps = [];
-      for (let i = 1; i < shots.length; i++) if (!shots[i].dip && shots[i].clipId !== shots[i - 1].clipId) gaps.push([Math.abs(HC.clip(shots[i].clipId).time - HC.clip(shots[i - 1].clipId).time), i]);
-      gaps.sort((a, b) => b[0] - a[0]).slice(0, Math.max(0, want)).forEach(([, i]) => shots[i].dip = true);
-    }
-    S.shots = shots;
+    // 順序：照拍攝時間，或依學到的「靜止／運鏡」接法重新排（只在同一段場景內調整）
+    const ordered = HC.orderShots(shots, opt, L);
+    // 轉場：依學到的偏好、或你指定的轉場
+    HC.assignTransitions(ordered, opt, L);
+    S.shots = ordered;
     HC.markAuto && HC.markAuto();
-    return shots;
+    return ordered;
 
     function mk(clipId, start, dur, mode, zoom, speed) {
-      return { id: HC.uid("s"), clipId, start: +start.toFixed(2), dur: +dur.toFixed(2), mode, zoom: +zoom.toFixed(2), speed, dip: false, text: "", stab: false, stabStr: opt.stabStr };
+      return { id: HC.uid("s"), clipId, start: +start.toFixed(2), dur: +dur.toFixed(2), mode, zoom: +zoom.toFixed(2), speed, tr: { type: "cut", dur: 0 }, text: "", stab: false, stabStr: opt.stabStr };
     }
+  };
+
+  /* ---------- 順序 ---------- */
+  const scenes = (shots, opt) => {
+    const out = [];
+    for (const s of shots) {
+      const last = out[out.length - 1], c = HC.clip(s.clipId);
+      const lc = last && HC.clip(last[last.length - 1].clipId);
+      if (!last || (opt.gap > 0 && lc && Math.abs(c.time - lc.time) > opt.gap * 60000)) out.push([s]); else last.push(s);
+    }
+    return out;
+  };
+  HC.orderShots = (shots, opt, L) => {
+    const mode = opt.order === "learn" ? (L && L.order && L.order.n ? (L.order.chrono >= 0.7 ? "time" : "seq") : "time") : opt.order;
+    if (mode === "time" || shots.length < 3) return shots;
+    const seq = mode === "seq" ? L.order.seq : { SS: 0.2, SM: 0.8, MS: 0.8, MM: 0.2 };
+    const type = (s) => (s.mode === "move" ? "M" : "S");
+    const out = [];
+    scenes(shots, opt).forEach((sc, k) => {
+      const rest = sc.slice();
+      let first = rest[0];
+      if (k === 0 && mode === "seq") {   // 開場鏡頭的類型：學你習慣用靜止還是運鏡開場
+        const want = L.order.firstS >= 0.5 ? "S" : "M";
+        first = rest.find((s) => type(s) === want) || rest[0];
+      }
+      out.push(first); rest.splice(rest.indexOf(first), 1);
+      while (rest.length) {
+        const prev = type(out[out.length - 1]);
+        const want = (seq[prev + "S"] || 0) >= (seq[prev + "M"] || 0) ? "S" : "M";
+        const nx = rest.find((s) => type(s) === want) || rest[0];   // 同類型裡挑拍攝時間最早的，盡量保持動線
+        out.push(nx); rest.splice(rest.indexOf(nx), 1);
+      }
+    });
+    return out;
+  };
+
+  /* ---------- 轉場 ---------- */
+  // 每個接點的情境：同一支素材、換素材、換場景（拍攝時間相隔很久）
+  HC.boundaryKind = (prev, cur, opt) => {
+    if (prev.clipId === cur.clipId) return "same";
+    const p = HC.clip(prev.clipId), c = HC.clip(cur.clipId);
+    return opt.gap > 0 && p && c && Math.abs(c.time - p.time) > opt.gap * 60000 ? "gap" : "change";
+  };
+  HC.assignTransitions = (shots, opt, L) => {
+    const mix = ["fade", "blur", "circle", "wipeR", "zoom", "slow"];
+    let mi = 0;
+    const used = { same: {}, change: {}, gap: {} };
+    const pick = (kind) => {   // 依比例輪流分配（和效果分配同一種做法，結果可重現）
+      const w = L.tr[kind] || {};
+      const tot = Object.values(w).reduce((a, b) => a + b, 0);
+      if (!tot) return kind === "gap" ? "black" : "cut";
+      const n = Object.values(used[kind]).reduce((a, b) => a + b, 0) + 1;
+      let best = "cut", bs = -Infinity;
+      for (const [t, v] of Object.entries(w)) { const sc = (v / tot) * n - (used[kind][t] || 0); if (sc > bs) { bs = sc; best = t; } }
+      used[kind][best] = (used[kind][best] || 0) + 1;
+      return best;
+    };
+    shots.forEach((s, i) => {
+      if (!i) { s.tr = { type: "cut", dur: 0 }; return; }
+      const kind = HC.boundaryKind(shots[i - 1], s, opt);
+      let type;
+      if (opt.trMode === "all") type = opt.trType;
+      else if (opt.trMode === "mix") type = kind === "same" ? "cut" : kind === "gap" ? "black" : mix[mi++ % mix.length];
+      else if (opt.trMode === "learn" && L && L.tr) type = pick(kind);
+      else type = kind === "gap" ? "black" : "cut";
+      const d = L && L.trDur && L.trDur[type] ? L.trDur[type] : HC.trInfo(type).dur;
+      s.tr = { type, dur: +d.toFixed(2) };
+    });
   };
 }

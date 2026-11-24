@@ -11,10 +11,12 @@ window.HC = window.HC || {};
   HC.state = {
     clips: [],
     shots: [],
-    title: { show: true, main: "FFXIV HOUSING", sub: "庭園 ・ Garden", font: "Noto Serif TC", size: 84, color: "#ffffff", pos: "center", line: true, dur: 5.5 },
+    title: { show: true, template: "classic", main: "FFXIV HOUSING", sub: "庭園 ・ Garden", info: "", font: "Noto Serif TC", size: 84, color: "#ffffff", accent: "#e9c46a", pos: "center", line: true, dur: 5.5 },
+    ending: { template: "none", main: "Thank you for watching", sub: "", info: "", dur: 4 },
+    look: { filter: "none", fx: { vignette: 0, glow: 0, bokeh: 0, petals: 0, grain: 0, letterbox: 0 } },
     music: { name: "", url: "", vol: 0.8, off: 0, fade: 3 },
     out: { res: 1080, rate: 10, fi: 1.5, fo: 2.5 },
-    auto: { len: 120, rhythm: 0.4, speed: 0.8, zoom: 0.16, tol: 0.5, head: 0.5, cursor: true, ui: true, stab: true, stabStr: 0.6, learn: true, cover: true, lateral: true, gap: 8 },
+    auto: { len: 120, rhythm: 0.4, speed: 0.8, zoom: 0.16, tol: 0.5, head: 0.5, cursor: true, ui: true, stab: true, stabStr: 0.6, learn: true, cover: true, lateral: true, gap: 8, trMode: "learn", trType: "cut", order: "learn" },
   };
 
   let uid = 1;
@@ -29,21 +31,38 @@ window.HC = window.HC || {};
   HC.clip = (id) => HC.state.clips.find((c) => c.id === id);
   HC.outDur = (s) => s.dur / s.speed;
 
-  /* 每個鏡頭在成品裡的開始時間 */
+  /* 轉場長度：第 i 個鏡頭「進場」的轉場，最多佔前後兩個鏡頭各一半 */
+  HC.trDur = (i) => {
+    const sh = HC.state.shots, s = sh[i], p = sh[i - 1];
+    if (!s || !p || !s.tr || s.tr.type === "cut") return 0;
+    return HC.clamp(s.tr.dur || 0.8, 0.1, Math.min(HC.outDur(p), HC.outDur(s)) * 0.5);
+  };
+  /* 每個鏡頭在成品裡的開始時間（有轉場時，下一個鏡頭會提早開始、和上一個重疊） */
   HC.timeline = () => {
-    const starts = [];
+    const starts = [], sh = HC.state.shots;
     let t = 0;
-    for (const s of HC.state.shots) { starts.push(t); t += HC.outDur(s); }
-    return { starts, total: t };
+    for (let i = 0; i < sh.length; i++) {
+      if (i) t = starts[i - 1] + HC.outDur(sh[i - 1]) - HC.trDur(i);
+      starts.push(t);
+    }
+    const n = sh.length;
+    return { starts, total: n ? starts[n - 1] + HC.outDur(sh[n - 1]) : 0 };
   };
   HC.shotAt = (T) => {
     const { starts, total } = HC.timeline();
     const n = HC.state.shots.length;
     if (!n) return null;
     T = HC.clamp(T, 0, Math.max(0, total - 1e-3));
-    let i = n - 1;
-    for (let k = 0; k < n; k++) if (T < starts[k] + HC.outDur(HC.state.shots[k])) { i = k; break; }
-    return { i, off: T - starts[i] };
+    let i = 0;
+    for (let k = 0; k < n; k++) if (starts[k] <= T) i = k;
+    const overlap = i > 0 && T < starts[i] + HC.trDur(i);
+    return { i, off: T - starts[i], overlap };
+  };
+  /* 舊版的「黑場」勾選轉成新的轉場格式 */
+  HC.migrateShot = (s) => {
+    if (!s.tr) s.tr = s.dip ? { type: "black", dur: 1.2 } : { type: "cut", dur: 0 };
+    delete s.dip;
+    return s;
   };
 
   /* 從檔名讀出拍攝時間，例如 FINAL_FANTASY_XIV_2026-11-10_13-38-25.mp4 */
@@ -55,11 +74,11 @@ window.HC = window.HC || {};
 
   /* ---------- 復原／重做 ---------- */
   const past = [], future = [];
-  const snap = () => JSON.stringify({ shots: HC.state.shots, title: HC.state.title, ex: HC.state.clips.map((c) => [c.id, c.excluded]) });
+  const snap = () => JSON.stringify({ shots: HC.state.shots, title: HC.state.title, ending: HC.state.ending, look: HC.state.look, ex: HC.state.clips.map((c) => [c.id, c.excluded]) });
   const restore = (j) => {
     const o = JSON.parse(j);
     HC.state.shots = o.shots;
-    HC.state.title = o.title;
+    HC.state.title = o.title; HC.state.ending = o.ending; HC.state.look = o.look;
     for (const [id, ex] of o.ex) { const c = HC.clip(id); if (c) c.excluded = ex; }
   };
   HC.commit = () => { past.push(snap()); if (past.length > 80) past.shift(); future.length = 0; };
