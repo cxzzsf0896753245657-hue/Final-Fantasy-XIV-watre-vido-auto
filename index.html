@@ -67,7 +67,14 @@
       <div id="shotEmpty" class="empty">在下方時間軸點一個鏡頭來調整。<br>或在左邊點素材，從素材裡挑片段加入。</div>
       <div id="shotForm" class="form hidden">
         <p class="clipname" id="sClip"></p>
-        <div class="row2">
+        <p class="multi hidden" id="sMulti"></p>
+        <p class="why hidden" id="sWhy"></p>
+        <div class="btnrow fb" id="sFbRow">
+          <button class="btn" id="sGood" aria-pressed="false" title="告訴自動剪輯：這種片段很好，多選一點">👍 好鏡頭</button>
+          <button class="btn" id="sBad" aria-pressed="false" title="告訴自動剪輯：不要再選這種片段">👎 不要這種</button>
+          <button class="btn" id="sSwap" title="從素材裡換一個分數次高的片段">換一個</button>
+        </div>
+        <div class="row2 single">
           <label>開始（秒）<input id="sStart" type="number" step="0.1" min="0"></label>
           <label>長度（秒）<input id="sDur" type="number" step="0.1" min="0.5"></label>
         </div>
@@ -84,6 +91,10 @@
           </select>
         </label>
         <label>縮放幅度 <output id="sZoomV"></output><input id="sZoom" type="range" min="0" max="35" step="1"></label>
+        <div class="focus single" id="sFocusRow">
+          <span>推近／縮放的目標點 <output id="sFocusV"></output></span>
+          <div class="btnrow"><button class="btn" id="sFocusPick" aria-pressed="false">在預覽畫面上點一下</button><button class="btn" id="sFocusAuto">自動</button></div>
+        </div>
         <label>播放速度
           <select id="sSpeed">
             <option value="0.5">0.5×</option><option value="0.6">0.6×</option><option value="0.8">0.8×</option>
@@ -97,14 +108,15 @@
           <label>轉場秒數<input id="sTrDur" type="number" step="0.1" min="0.1" max="3"></label>
         </div>
         <label>這個鏡頭的濾鏡<select id="sFilter"></select></label>
-        <label>畫面文字（選填）<input id="sText" type="text" placeholder="例如：夜、臥室"></label>
-        <div class="btnrow">
+        <label class="single">畫面文字（選填）<input id="sText" type="text" placeholder="例如：夜、臥室"></label>
+        <div class="btnrow single">
           <button class="btn" id="sHere">從播放位置開始</button>
+          <button class="btn" id="sSplit" title="快捷鍵 S">在播放位置分割</button>
           <button class="btn" id="sSrc">看原始素材</button>
         </div>
         <div class="btnrow">
-          <button class="btn" id="sLeft">← 往前</button>
-          <button class="btn" id="sRight">往後 →</button>
+          <button class="btn single" id="sLeft">← 往前</button>
+          <button class="btn single" id="sRight">往後 →</button>
           <button class="btn" id="sDup">複製</button>
           <button class="btn danger" id="sDel">刪除</button>
         </div>
@@ -146,6 +158,7 @@
       <label>防抖強度 <output id="aStabV"></output><input id="aStabStr" type="range" min="0" max="100" step="5" value="60"></label>
       <label class="check"><input id="aCover" type="checkbox" checked> 每支素材至少用一個鏡頭</label>
       <label class="check"><input id="aLateral" type="checkbox" checked> 優先挑橫向移動的運鏡</label>
+      <label class="check"><input id="aBeat" type="checkbox" checked> 剪接點對齊音樂拍點（有選背景音樂時）</label>
       <label>拍攝時間相隔超過幾分鐘，就算不同場景<input id="aGap" type="number" value="8" min="0" step="1"></label>
       <label>畫面換場景的判斷靈敏度 <output id="aSceneV"></output><input id="aSceneLook" type="range" min="0" max="100" step="5" value="50"></label>
       <p class="hint">例如庭園 → 室內。分錯了可以在左邊素材區手動「分場景」或「併回」。</p>
@@ -219,11 +232,20 @@
       <label>音量 <output id="mVolV"></output><input id="mVol" type="range" min="0" max="100" value="80"></label>
       <label>從音樂的第幾秒開始<input id="mOff" type="number" value="0" step="0.5" min="0"></label>
       <label>結尾淡出（秒）<input id="mFade" type="number" value="3" step="0.5" min="0"></label>
+      <p class="hint" id="mBeat"></p>
+      <button class="btn" id="mSnap" disabled>把剪接點對齊拍點</button>
       <button class="btn" id="mClear">移除音樂</button>
     </div>
 
     <div class="pane" id="pane-learn">
       <p class="hint">自動剪輯會越用越像你：記住你怎麼修改自動剪輯的結果，也能從你喜歡的影片學剪法。學習資料存在這個瀏覽器裡。</p>
+      <label>使用的風格<select id="lProf"></select></label>
+      <div class="btnrow">
+        <button class="btn" id="lNew" title="用目前的風格複製一套新的">另存新風格</button>
+        <button class="btn" id="lRename">改名</button>
+        <button class="btn" id="lDel">刪除這套</button>
+        <button class="btn" id="lUndo" title="退回這套風格上一次學習之前的樣子">退回上一版</button>
+      </div>
       <div class="learned" id="lSummary"></div>
       <button class="btn primary wide" id="lEdit">記住這次的修改</button>
       <p class="hint">匯出影片時也會自動記住。</p>
@@ -242,7 +264,9 @@
     <div class="pane" id="pane-out">
       <label>匯出方式<select id="oMode"><option value="frames">逐格輸出（不掉格，較慢）</option><option value="realtime">即時錄製（較快，電腦忙時可能掉格）</option></select></label>
       <label>每秒格數<select id="oFps"><option value="30">30 fps</option><option value="60">60 fps</option></select></label>
-      <label>解析度<select id="oRes"><option value="1080">1920×1080</option><option value="720">1280×720</option></select></label>
+      <label>畫面比例<select id="oAspect"><option value="16:9">橫式 16:9（YouTube）</option><option value="9:16">直式 9:16（Shorts、Reels、TikTok）</option></select></label>
+      <p class="hint" id="oAspectHint"></p>
+      <label>解析度<select id="oRes"><option value="1080">1080p</option><option value="720">720p</option></select></label>
       <label>畫質<select id="oRate"><option value="16">高（約 16 Mbps）</option><option value="10" selected>標準（約 10 Mbps）</option><option value="5">小檔（約 5 Mbps）</option></select></label>
       <label>片頭淡入（秒）<input id="oFi" type="number" value="1.5" step="0.5" min="0"></label>
       <label>片尾淡出（秒）<input id="oFo" type="number" value="2.5" step="0.5" min="0"></label>
@@ -259,6 +283,10 @@
   <section class="tl" aria-label="時間軸">
     <div class="tlhead">
       <h2>時間軸</h2><span id="tlInfo" class="muted"></span>
+      <details class="keys"><summary>快捷鍵</summary>
+        <p><kbd>空白</kbd>／<kbd>K</kbd> 播放暫停 ・ <kbd>J</kbd> <kbd>L</kbd> 倒退／前進 2 秒 ・ <kbd>←</kbd> <kbd>→</kbd> 逐格（加 <kbd>Shift</kbd> 跳 1 秒）・ <kbd>Home</kbd> <kbd>End</kbd> 開頭／結尾<br>
+        <kbd>S</kbd> 分割 ・ <kbd>Delete</kbd> 刪除 ・ <kbd>Ctrl</kbd>+<kbd>D</kbd> 複製 ・ <kbd>Ctrl</kbd>+<kbd>A</kbd> 全選 ・ <kbd>Ctrl</kbd>/<kbd>Shift</kbd>+點 多選 ・ <kbd>Ctrl</kbd>+<kbd>Z</kbd> 復原<br>
+        拖鏡頭左右邊緣可以修剪長度，會自動吸附到播放位置和音樂拍點。</p></details>
       <label class="zoom">縮放<input id="tlZoom" type="range" min="4" max="40" value="12" aria-label="時間軸縮放"></label>
     </div>
     <div class="tlscroll" id="tlScroll">
@@ -274,11 +302,13 @@
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
 <script src="js/state.js"></script>
+<script src="js/persist.js"></script>
 <script src="js/analyze.js"></script>
 <script src="js/stab.js"></script>
 <script src="js/learn.js"></script>
 <script src="js/effects.js"></script>
 <script src="js/hyperframes.js"></script>
+<script src="js/beats.js"></script>
 <script src="js/auto.js"></script>
 <script src="js/render.js"></script>
 <script src="js/vendor/mp4-muxer.min.js"></script>

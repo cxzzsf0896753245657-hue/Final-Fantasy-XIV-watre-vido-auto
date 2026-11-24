@@ -43,7 +43,8 @@
   function drawShot(c, v, s, lt) {
     const W = canvas.width, H = canvas.height, od = HC.outDur(s);
     const e = ease(lt / od), k = s.zoom || 0;
-    let z = 1, fx = 0.5, fy = 0.5;
+    // 以目標點為中心縮放：目標點在畫面上的位置不變，周圍放大（直式時也用它決定保留哪一塊）
+    let z = 1, [fx, fy] = HC.focusOf(s);
     switch (s.mode) {
       case "in": z = 1 + k * e; break;
       case "out": z = 1 + k - k * e; break;
@@ -322,14 +323,14 @@
     R.stop();
     R.exporting = true;
     const H0 = canvas.height;
-    const h = S.out.res === 720 ? 720 : 1080;
-    canvas.width = h * 16 / 9; canvas.height = h;
+    const H0w = canvas.width, sz = HC.outSize();
+    canvas.width = sz.W; canvas.height = sz.H;
     const stream = canvas.captureStream(30);
     if (S.music.url) for (const tr of R.music.stream().getAudioTracks()) stream.addTrack(tr);
     const rec = new MediaRecorder(stream, { mimeType: mime || undefined, videoBitsPerSecond: S.out.rate * 1e6, audioBitsPerSecond: 192000 });
     const chunks = [];
     rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
-    const restore = () => { R.exporting = false; canvas.width = H0 * 16 / 9; canvas.height = H0; R.onTime = prevOnTime; };
+    const restore = () => { R.exporting = false; canvas.width = H0w; canvas.height = H0; R.onTime = prevOnTime; };
     rec.onstop = () => {
       restore();
       resolve({ blob: new Blob(chunks, { type: (mime || "video/webm").split(";")[0] }), ext: (mime || "webm").includes("mp4") ? "mp4" : "webm" });

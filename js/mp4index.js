@@ -166,6 +166,18 @@
         if (!cur && frames.length) cur = frames.shift();
         return cur;
       },
+      /* 依序拿下一格（分析、防抖量測用）；沒有了回傳 null */
+      async nextFrame() {
+        while (!err && !frames.length && !(ended && dec.decodeQueueSize === 0)) {
+          if (ended) { await wait(); continue; }
+          if (dec.decodeQueueSize < 8 || !(await wait())) await feed();
+        }
+        if (err) throw err;
+        if (cur) { cur.close(); cur = null; }
+        if (!frames.length) return null;
+        cur = frames.shift();
+        return cur;
+      },
       close() { try { dec.close(); } catch (e) {} if (cur) cur.close(); cur = null; frames.forEach((f) => f.close()); frames.length = 0; },
     };
   };

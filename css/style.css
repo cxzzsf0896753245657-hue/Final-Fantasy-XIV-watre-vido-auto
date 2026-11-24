@@ -129,8 +129,8 @@ input[type=range]{accent-color:var(--still);width:100%;min-height:24px}
 .ruler{position:absolute;left:0;right:0;top:0;height:20px;cursor:pointer;border-bottom:1px solid var(--line)}
 .ruler span{position:absolute;top:2px;font-size:13px;color:var(--mute);transform:translateX(-50%);white-space:nowrap;font-variant-numeric:tabular-nums}
 .ruler span::after{content:"";position:absolute;left:50%;top:17px;width:1px;height:4px;background:var(--line)}
-.shots{position:absolute;left:0;top:26px;height:86px;display:flex}
-.shot{position:relative;height:100%;border-radius:6px;overflow:hidden;border:2px solid transparent;background:#000 center/cover no-repeat;cursor:grab;flex:none;margin-right:2px}
+.shots{position:absolute;left:0;top:26px;height:86px}
+.shot{position:absolute;top:0;height:100%;box-sizing:border-box;border-radius:6px;overflow:hidden;border:2px solid transparent;background:#000 center/cover no-repeat;cursor:grab}
 .shot::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0) 40%,rgba(0,0,0,.75))}
 .shot .k{position:absolute;left:0;right:0;top:0;height:4px}
 .shot.st .k{background:var(--still)}
@@ -210,3 +210,36 @@ input[type=range]{accent-color:var(--still);width:100%;min-height:24px}
 .pv canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 .pv .badge{position:absolute;right:4px;top:4px;font:600 11px/1 "Noto Sans TC",sans-serif;background:var(--accent);color:#1b1813;border-radius:3px;padding:2px 4px}
 .tile.sel .pv{box-shadow:0 0 0 2px var(--still)}
+
+/* 修剪把手、多選、回饋 */
+.shot .h{position:absolute;top:0;bottom:0;width:9px;cursor:ew-resize;z-index:2;touch-action:none}
+.shot .h.l{left:0}.shot .h.r{right:0}
+.shot .h::after{content:"";position:absolute;top:30%;bottom:30%;left:3px;width:3px;border-radius:2px;background:rgba(255,255,255,.85);opacity:0;transition:opacity .12s}
+.shot:hover .h::after,.shot.on .h::after,.shot.trimming .h::after{opacity:1}
+.shot.trimming{cursor:ew-resize}
+.shot .fbk{position:absolute;left:5px;top:7px;font-size:12px;line-height:1;z-index:1}
+.trimtip{position:absolute;top:-2px;transform:translate(-50%,-100%);background:var(--accent);color:#111;font-size:12px;padding:2px 6px;border-radius:4px;white-space:nowrap;pointer-events:none;z-index:5;font-variant-numeric:tabular-nums}
+.beat{position:absolute;top:20px;width:1px;height:6px;background:var(--accent);opacity:.7;pointer-events:none}
+.multi{margin:0;padding:8px 10px;border-radius:8px;background:var(--panel2);font-size:13px}
+.why{margin:0;font-size:12px;color:var(--mute);line-height:1.5}
+.fb .btn[aria-pressed="true"]{border-color:var(--accent);color:var(--ink);background:var(--panel2)}
+.focus{display:flex;flex-direction:column;gap:6px;font-size:13px}
+.focus output{color:var(--mute)}
+#sFocusPick[aria-pressed="true"]{border-color:var(--accent)}
+.stage.picking canvas{cursor:crosshair}
+.focusdot{position:absolute;width:18px;height:18px;margin:-9px 0 0 -9px;border:2px solid var(--accent);border-radius:50%;box-shadow:0 0 0 2px rgba(0,0,0,.5);pointer-events:none}
+details.keys{font-size:12px;color:var(--mute)}
+details.keys summary{cursor:pointer}
+details.keys p{margin:6px 0 0;line-height:1.9}
+kbd{font:inherit;font-size:11px;padding:1px 5px;border:1px solid var(--line);border-radius:4px;background:var(--panel2);color:var(--ink)}
+.form.many .single{display:none}
+.resume,.relink{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 10px;padding:10px;border-radius:8px;background:var(--panel2);border:1px solid var(--line);font-size:13px}
+.resume span,.relink span{flex:1 1 100%;line-height:1.5}
+.resume strong{display:block;color:var(--ink)}
+.scene select{font:inherit;font-size:11px;font-weight:400;padding:1px 4px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--ink);margin-left:auto;width:auto;flex:0 1 auto;min-width:0;max-width:96px}
+.scene span{white-space:nowrap;display:flex;align-items:baseline}
+.scene small{white-space:nowrap}
+.scene button{white-space:nowrap}
+.scene{flex-wrap:wrap}
+.screen.vertical{aspect-ratio:9/16;width:auto;height:calc(100vh - 330px);max-width:100%;max-height:none}
+@media (max-width:900px){.screen.vertical{height:70vh}}

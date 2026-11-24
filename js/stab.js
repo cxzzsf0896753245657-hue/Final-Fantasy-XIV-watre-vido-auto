@@ -76,7 +76,37 @@
   }
 
   /* 逐格量測位移 */
+  /* 一般 MP4：直接依序解碼，不用慢速播放（快很多） */
+  async function measureDecode(clip, a, b) {
+    const ix = clip.file && HC.mp4Index ? await HC.mp4Index(clip.file).catch(() => null) : null;
+    if (!ix) return null;
+    const from = Math.max(0, a - 0.4), to = b + 0.4;
+    const cv = document.createElement("canvas"); cv.width = FW; cv.height = FH;
+    const cx = cv.getContext("2d", { willReadFrequently: true });
+    cx.imageSmoothingQuality = "high";
+    const T = [], X = [], Y = [], src = HC.decodeSource(clip.file, ix, from);
+    let prev = null, px = 0, py = 0;
+    try {
+      for (;;) {
+        const fr = await src.nextFrame();
+        if (!fr) break;
+        const t = fr.timestamp / 1e6;
+        if (t < from - 1e-3) continue;
+        if (t > to) break;
+        cx.drawImage(fr, 0, 0, FW, FH);
+        const d = cx.getImageData(0, 0, FW, FH).data, g = new Float32Array(FW * FH);
+        for (let i = 0, j = 0; i < g.length; i++, j += 4) g[i] = d[j] * 0.3 + d[j + 1] * 0.59 + d[j + 2] * 0.11;
+        if (prev) { const [dx, dy] = shiftPyramid(prev, g); px += dx; py += dy; }
+        prev = g;
+        T.push(t); X.push(px / FW); Y.push(py / FH);
+      }
+    } finally { src.close(); }
+    return T.length >= 4 ? { t: Float64Array.from(T), x: Float64Array.from(X), y: Float64Array.from(Y) } : null;
+  }
+
   async function measure(clip, a, b) {
+    const fast = await measureDecode(clip, a, b).catch(() => null);
+    if (fast) return fast;
     const v = document.createElement("video");
     v.muted = true; v.playsInline = true; v.preload = "auto"; v.src = clip.url;
     await HC.once(v, "loadeddata", 15000);

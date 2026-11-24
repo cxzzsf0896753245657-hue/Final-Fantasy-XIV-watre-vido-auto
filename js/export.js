@@ -83,7 +83,7 @@
 
   R.exportFrames = async (onProgress, isCancelled) => {
     const S = HC.state, canvas = R.canvas();
-    const fps = S.out.fps || 30, h = S.out.res === 720 ? 720 : 1080, W = Math.round(h * 16 / 9), H = h;
+    const fps = S.out.fps || 30, { W, H } = HC.outSize();
     const { starts, total } = HC.timeline();
     const vc = await pickVideo(W, H, fps, S.out.rate * 1e6);
     if (!vc) throw new Error("這個瀏覽器沒有可用的影片編碼器，請改用「即時錄製」");

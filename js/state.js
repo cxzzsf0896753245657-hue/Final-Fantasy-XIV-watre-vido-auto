@@ -15,8 +15,8 @@ window.HC = window.HC || {};
     ending: { template: "none", main: "Thank you for watching", sub: "", info: "", dur: 4 },
     look: { filter: "none", filterStr: 1, tintStr: 1, fx: { vignette: 0, glow: 0, bokeh: 0, petals: 0, grain: 0, letterbox: 0 } },
     music: { name: "", url: "", vol: 0.8, off: 0, fade: 3 },
-    out: { mode: "frames", fps: 30, res: 1080, rate: 10, fi: 1.5, fo: 2.5 },
-    auto: { len: 120, rhythm: 0.4, speed: 0.8, zoom: 0.16, tol: 0.5, head: 0.5, cursor: true, ui: true, stab: true, stabStr: 0.6, learn: true, cover: true, lateral: true, gap: 8, sceneLook: 0.5, trMode: "learn", trType: "cut", order: "learn" },
+    out: { mode: "frames", fps: 30, aspect: "16:9", res: 1080, rate: 10, fi: 1.5, fo: 2.5 },
+    auto: { len: 120, rhythm: 0.4, speed: 0.8, zoom: 0.16, tol: 0.5, head: 0.5, cursor: true, ui: true, stab: true, stabStr: 0.6, learn: true, cover: true, lateral: true, gap: 8, sceneLook: 0.5, trMode: "learn", trType: "cut", order: "learn", beat: true },
   };
 
   let uid = 1;
@@ -30,6 +30,14 @@ window.HC = window.HC || {};
   };
   HC.clip = (id) => HC.state.clips.find((c) => c.id === id);
   HC.outDur = (s) => s.dur / s.speed;
+  /* 成品畫面大小：橫式 16:9 或直式 9:16（Shorts／Reels） */
+  HC.outSize = (res) => {
+    const h = (res || HC.state.out.res) === 720 ? 720 : 1080, v = HC.state.out.aspect === "9:16";
+    return v ? { W: h, H: Math.round(h * 16 / 9) } : { W: Math.round(h * 16 / 9), H: h };
+  };
+  HC.vertical = () => HC.state.out.aspect === "9:16";
+  /* 鏡頭的目標點（推近的中心；直式時也決定保留畫面的哪一塊）：你設定的 > 自動找到的 > 正中央 */
+  HC.focusOf = (s) => [s.fx ?? s.afx ?? 0.5, s.fy ?? s.afy ?? 0.5];
 
   /* 轉場長度：第 i 個鏡頭「進場」的轉場，最多佔前後兩個鏡頭各一半 */
   HC.trDur = (i) => {
@@ -74,12 +82,12 @@ window.HC = window.HC || {};
 
   /* ---------- 復原／重做 ---------- */
   const past = [], future = [];
-  const snap = () => JSON.stringify({ shots: HC.state.shots, title: HC.state.title, ending: HC.state.ending, look: HC.state.look, ex: HC.state.clips.map((c) => [c.id, c.excluded, c.sceneMark || ""]) });
+  const snap = () => JSON.stringify({ shots: HC.state.shots, title: HC.state.title, ending: HC.state.ending, look: HC.state.look, ex: HC.state.clips.map((c) => [c.id, c.excluded, c.sceneMark || "", c.stype || ""]) });
   const restore = (j) => {
     const o = JSON.parse(j);
     HC.state.shots = o.shots;
     HC.state.title = o.title; HC.state.ending = o.ending; HC.state.look = o.look;
-    for (const [id, ex, mk] of o.ex) { const c = HC.clip(id); if (c) { c.excluded = ex; c.sceneMark = mk || ""; } }
+    for (const [id, ex, mk, st] of o.ex) { const c = HC.clip(id); if (c) { c.excluded = ex; c.sceneMark = mk || ""; c.stype = st || ""; } }
     HC.computeScenes && HC.computeScenes();
   };
   HC.commit = () => { past.push(snap()); if (past.length > 80) past.shift(); future.length = 0; };

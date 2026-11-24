@@ -11,7 +11,7 @@
   const HC = window.HC;
   const GSAP_URL = "https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js";
   const HF_VER = "0.9.88";
-  const W = 1920, H = 1080;
+  let W = 1920, H = 1080;   // 打包時依「匯出」分頁的畫面比例決定
 
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const r3 = (x) => Math.round(x * 1000) / 1000;
@@ -33,7 +33,20 @@
     }
   }
 
+  /* 直式時平移改成移動 object-position（橫式素材在直式畫面裡左右有很多可以移） */
+  function panPos(s) {
+    if (W >= H) return null;
+    const [fx, fy] = HC.focusOf(s).map((v) => Math.round(v * 100));
+    switch (s.mode) {
+      case "panR": return [`0% ${fy}%`, `100% ${fy}%`];
+      case "panL": return [`100% ${fy}%`, `0% ${fy}%`];
+      default: return null;
+    }
+  }
   HC.buildHyperframes = async ({ includeClips = true, name = "housing", onProgress } = {}) => {
+    ({ W, H } = HC.outSize(1080));
+    // 素材（16:9）蓋滿畫面後的實際大小：防抖位移要用這個換算成像素
+    const DW = Math.max(W, H * 16 / 9), DH = Math.max(H, W * 9 / 16);
     const S = HC.state, { starts, total } = HC.timeline();
     const shots = S.shots;
     const used = [...new Set(shots.map((s) => s.clipId))].map((id) => HC.clip(id));
@@ -48,7 +61,7 @@
       const crop = HC.stabCrop(s), keys = [];
       for (let t = 0; t <= HC.outDur(s) + 1e-6; t += 1 / 30) {
         const o = HC.stabOffset(s, s.start + t * s.speed);
-        if (o) keys.push([r3(t), Math.round(-o[0] * W * crop * 10) / 10, Math.round(-o[1] * H * crop * 10) / 10]);
+        if (o) keys.push([r3(t), Math.round(-o[0] * DW * crop * 10) / 10, Math.round(-o[1] * DH * crop * 10) / 10]);
       }
       stabKeys[i] = { crop: r3(crop), keys };
     });
@@ -60,8 +73,12 @@
 
     const clipsHtml = shots.map((s, i) => {
       const f = HC.filterCss(s.filter || S.look.filter, S.look.filterStr ?? 1);
-      return `  <div class="frame" id="f${i}" style="z-index:${i + 1}"><div class="stab" id="s${i}"><div class="kb" id="k${i}">
-    <video id="v${i}" class="clip" data-start="${r3(starts[i])}" data-duration="${r3(HC.outDur(s))}" data-track-index="${i % 2}" data-media-start="${r3(s.start)}" data-playback-rate="${s.speed}" src="${fileOf.get(s.clipId)}" muted playsinline${f ? ` style="filter:${f}"` : ""}></video>
+      let [fx, fy] = HC.focusOf(s).map((v) => r3(v * 100));
+      if (s.mode === "panR" || s.mode === "panL") fx = 50;   // 平移時，移動方向用置中當縮放中心
+      if (s.mode === "panU" || s.mode === "panD") fy = 50;
+      // 目標點：縮放的中心（transform-origin），直式時也決定保留哪一塊（object-position）
+      return `  <div class="frame" id="f${i}" style="z-index:${i + 1}"><div class="stab" id="s${i}"><div class="kb" id="k${i}" style="transform-origin:${fx}% ${fy}%">
+    <video id="v${i}" class="clip" data-start="${r3(starts[i])}" data-duration="${r3(HC.outDur(s))}" data-track-index="${i % 2}" data-media-start="${r3(s.start)}" data-playback-rate="${s.speed}" src="${fileOf.get(s.clipId)}" muted playsinline style="object-position:${fx}% ${fy}%${f ? `;filter:${f}` : ""}"></video>
   </div></div></div>`;
     }).join("\n");
 
@@ -98,7 +115,7 @@ ${hasMusic ? `  <audio id="music" data-start="0" data-duration="${r3(total)}" da
 (${HC.effectsSource})();
 </script>
 <script>
-const SHOTS = ${JSON.stringify(shots.map((s, i) => ({ start: r3(starts[i]), dur: r3(HC.outDur(s)), kb: kenBurns(s), tr: i && s.tr && s.tr.type !== "cut" ? { type: s.tr.type, dur: r3(HC.trDur(i)) } : null })))};
+const SHOTS = ${JSON.stringify(shots.map((s, i) => ({ start: r3(starts[i]), dur: r3(HC.outDur(s)), kb: kenBurns(s), op: panPos(s), tr: i && s.tr && s.tr.type !== "cut" ? { type: s.tr.type, dur: r3(HC.trDur(i)) } : null })))};
 const STAB = ${JSON.stringify(stabKeys)};
 const INFO = ${JSON.stringify(info).replace(/</g, "\\u003c")};
 const FONTS = ${JSON.stringify(fonts)};
@@ -109,6 +126,8 @@ function build() {
   SHOTS.forEach((s, i) => {
     // 推近／平移
     if (s.kb) tl.fromTo("#k" + i, s.kb[0], { ...s.kb[1], duration: s.dur, ease: "sine.inOut" }, s.start);
+    // 直式畫面的平移：素材比畫面寬很多，改成移動「保留哪一塊」
+    if (s.op) tl.fromTo("#v" + i, { objectPosition: s.op[0] }, { objectPosition: s.op[1], duration: s.dur, ease: "sine.inOut" }, s.start);
     // 防抖：放大一點，再逐格位移抵銷晃動
     const st = STAB[i];
     if (st) {

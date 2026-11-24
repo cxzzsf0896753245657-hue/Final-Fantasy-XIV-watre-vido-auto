@@ -9,7 +9,11 @@
    - 順序：照拍攝順序的程度、靜止和運鏡怎麼接、用哪一種鏡頭開場
    - 轉場：同一支素材內、換素材、換場景時各用哪種轉場、多長
    - 畫面：鏡頭長短、短鏡頭比例、縮放幅度、推近／平移比例、常用的開頭、片尾、濾鏡
+   - 細部修改：運鏡鏡頭頭尾通常裁掉多少、每種效果用多大的縮放、哪種畫面你會改成推近或平移（畫面內容 → 效果的小模型）
+   - 👍／👎 和「換一個」：直接當成好／壞範例，權重比較大
+   - 依場景類型分開學：你標了「庭園」「室內」之後，各自記一套鏡頭長短、縮放、效果比例；也會記住各類型畫面的色彩，之後自動猜
    你自己的修改影響比較大（權重 0.4），參考影片比較小（0.25）。
+   可以有好幾套風格（例如「慢慢欣賞」「短影音」），每次學習前會留一份備份，可以「退回上一版」。
    學習資料存在這個瀏覽器裡，也可以匯出成檔案備份或帶到別台電腦。
 */
 {
@@ -25,6 +29,9 @@
       tr: { same: { cut: 1 }, change: { cut: 1 }, gap: { black: 1 } }, trDur: {} },
     look: { opening: {}, ending: {}, filter: {}, fx: {} },
     refs: [], examples: [], w: null,
+    fine: { n: 0, trimHead: 0, trimTail: 0, zoomBy: {} },   // 細部修改
+    modeEx: [], modeW: null,                                // 畫面內容 → 效果
+    byType: {}, typeSig: {},                                // 依場景類型
   });
   // 舊版學習資料補上新欄位
   const upgrade = (o) => {
@@ -33,15 +40,39 @@
     out.style = Object.assign(fresh().style, o.style || {});
     for (const k of ["order", "tr"]) out.style[k] = Object.assign(fresh().style[k], (o.style || {})[k] || {});
     out.look = Object.assign(fresh().look, o.look || {});
+    out.fine = Object.assign(fresh().fine, o.fine || {});
+    for (const k of ["modeEx", "byType", "typeSig"]) out[k] = o[k] || fresh()[k];
     if (o.style && o.style.dipRatio > 0.05 && !(o.style.tr)) out.style.tr.change = { cut: 1 - o.style.dipRatio, black: o.style.dipRatio };
     return out;
   };
-  HC.profile = fresh();
-  try { const j = localStorage.getItem(KEY); if (j) HC.profile = upgrade(JSON.parse(j)); } catch (e) {}
-  HC.saveProfile = () => { try { localStorage.setItem(KEY, JSON.stringify(HC.profile)); } catch (e) {} };
-  HC.resetProfile = () => { HC.profile = fresh(); HC.saveProfile(); };
-  HC.hasLearned = () => HC.profile.edits > 0 || HC.profile.refs.length > 0;
-  HC.importProfile = (o) => { if (!o || !o.style) throw new Error("bad"); HC.profile = upgrade(o); HC.saveProfile(); };
+  /* ---------- 好幾套風格 + 每次學習前的備份 ---------- */
+  const KEY2 = "housingcut.profiles.v1", HIST = 10;
+  let store = { active: "我的風格", list: {}, hist: {} };
+  try {
+    const j2 = localStorage.getItem(KEY2);
+    if (j2) store = JSON.parse(j2);
+    else { const j = localStorage.getItem(KEY); store.list["我的風格"] = j ? JSON.parse(j) : fresh(); }   // 舊版只有一套
+  } catch (e) {}
+  if (!store.list[store.active]) store.list[store.active] = fresh();
+  for (const k of Object.keys(store.list)) store.list[k] = upgrade(store.list[k]);
+  store.hist = store.hist || {};
+  HC.profile = store.list[store.active];
+  HC.saveProfile = () => { store.list[store.active] = HC.profile; try { localStorage.setItem(KEY2, JSON.stringify(store)); } catch (e) {} };
+  /* 學習前先備份（「退回上一版」用） */
+  HC.snapshotProfile = () => { const h = (store.hist[store.active] = store.hist[store.active] || []); h.push(JSON.stringify(HC.profile)); if (h.length > HIST) h.shift(); };
+  HC.profiles = {
+    names: () => Object.keys(store.list),
+    active: () => store.active,
+    use(name) { if (!store.list[name]) return; store.active = name; HC.profile = store.list[name]; HC.saveProfile(); },
+    create(name, copy) { if (!name || store.list[name]) return false; store.list[name] = copy ? upgrade(JSON.parse(JSON.stringify(HC.profile))) : fresh(); this.use(name); return true; },
+    rename(name) { if (!name || store.list[name]) return false; const o = store.active; store.list[name] = store.list[o]; delete store.list[o]; store.hist[name] = store.hist[o]; delete store.hist[o]; store.active = name; HC.saveProfile(); return true; },
+    remove() { const names = Object.keys(store.list); if (names.length < 2) return false; delete store.list[store.active]; delete store.hist[store.active]; this.use(Object.keys(store.list)[0]); return true; },
+    canUndo: () => !!(store.hist[store.active] || []).length,
+    undo() { const h = store.hist[store.active] || []; if (!h.length) return false; HC.profile = upgrade(JSON.parse(h.pop())); HC.saveProfile(); return true; },
+  };
+  HC.resetProfile = () => { HC.snapshotProfile(); HC.profile = fresh(); HC.saveProfile(); };
+  HC.hasLearned = () => HC.profile.edits > 0 || HC.profile.refs.length > 0 || HC.profile.examples.length > 0;
+  HC.importProfile = (o) => { if (!o || !o.style) throw new Error("bad"); HC.snapshotProfile(); HC.profile = upgrade(o); HC.saveProfile(); };
 
   /* ---------- 片段特徵 ---------- */
   HC.features = (clipId, a, b, isMove) => {
@@ -69,7 +100,7 @@
     let w = new Array(d + 1).fill(0);
     for (let ep = 0; ep < 400; ep++) for (const e of ex) {
       const p = sig(w[d] + e.f.reduce((s, v, k) => s + v * w[k], 0));
-      const g = p - e.y;
+      const g = (p - e.y) * (e.w || 1);   // 👍／👎 的範例權重比較大
       for (let k = 0; k < d; k++) w[k] -= 0.08 * (g * e.f[k] + 0.01 * w[k]);
       w[d] -= 0.08 * g;
     }
@@ -105,6 +136,12 @@
       ...orderOf(shots.map((s) => [s.mode === "move" ? "M" : "S", (HC.clip(s.clipId) || {}).time || 0, s.start])),
       ...trOf(shots),
     };
+  }
+  /* 某一類場景的鏡頭風格（不含順序、轉場這些整支影片的東西） */
+  function styleOfSubset(shots) {
+    if (shots.length < 3) return null;
+    const o = styleOf(shots);
+    return o && { longStill: o.longStill, shortStill: o.shortStill, rhythm: o.rhythm, zoom: o.zoom, moveSpeed: o.moveSpeed, moveRatio: o.moveRatio, modes: o.modes };
   }
   /* 順序：照拍攝時間的比例、靜止／運鏡怎麼接、開場鏡頭類型。items = [[類型, 拍攝時間, 起點]] */
   function orderOf(items) {
@@ -166,17 +203,113 @@
   }
   HC.topOf = (m) => Object.entries(m || {}).sort((a, b) => b[1] - a[1])[0];
 
+  /* ---------- 畫面內容：細節分布 → 目標點、推近還是平移 ---------- */
+  const MODES = ["in", "out", "panR", "panL", "panU", "panD"];
+  HC.MODES = MODES;
+  /* 一段素材的畫面內容：4×4 細節格的平均、目標點、特徵 */
+  HC.shotLook = (clipId, a, b) => {
+    const c = HC.clip(clipId), A = c && c.ana;
+    if (!A || !A.grid || !A.grid.length) return null;
+    const g = new Array(16).fill(0); let n = 0;
+    A.gt.forEach((t, i) => { if (t >= a - 0.25 && t <= b + 0.25) { for (let k = 0; k < 16; k++) g[k] += A.grid[i][k]; n++; } });
+    if (!n) return null;
+    for (let k = 0; k < 16; k++) g[k] /= n;
+    const tot = g.reduce((x, y) => x + y, 0) || 1, mean = tot / 16;
+    let cx = 0, cy = 0, wsum = 0, L = 0, Rr = 0, T = 0, B = 0, sd = 0;
+    for (let k = 0; k < 16; k++) {
+      const x = (k % 4 + 0.5) / 4, y = (Math.floor(k / 4) + 0.5) / 4, w = Math.max(0, g[k] - mean);
+      cx += x * w; cy += y * w; wsum += w; sd += (g[k] - mean) ** 2;
+      if (k % 4 < 2) L += g[k]; else Rr += g[k];
+      if (k < 8) T += g[k]; else B += g[k];
+    }
+    const center = (g[5] + g[6] + g[9] + g[10]) / tot;
+    // 目標點：細節最集中的地方，往中間拉一點，避免推到邊邊
+    const fx = wsum ? 0.5 + 0.7 * (cx / wsum - 0.5) : 0.5, fy = wsum ? 0.5 + 0.6 * (cy / wsum - 0.5) : 0.5;
+    const f = [center * 4 - 1, (Rr - L) / tot * 2, (B - T) / tot * 2, Math.sqrt(sd / 16) / (mean || 1)];
+    return { focus: [+HC.clamp(fx, 0.22, 0.78).toFixed(3), +HC.clamp(fy, 0.25, 0.75).toFixed(3)], f };
+  };
+  /* 沒學過時的規則：細節集中在中間 → 推近；左右明顯不平均 → 往細節多的那邊平移；很平均 → 拉遠 */
+  const rulePref = (f) => {
+    const [cc, lr, tb, cv] = f;
+    return { in: 0.3 + 1.2 * Math.max(0, cc), out: 0.3 + Math.max(0, 0.5 - cv), panR: 0.2 + 2 * Math.max(0, lr), panL: 0.2 + 2 * Math.max(0, -lr), panU: 0.05 + Math.max(0, -tb), panD: 0.05 + Math.max(0, tb) };
+  };
+  /* 學過的話：小型多類別邏輯迴歸，算出每種效果的機率 */
+  const modeFeat = (f, type) => [...f, type === "garden" ? 1 : 0, type === "indoor" ? 1 : 0];
+  function trainModes() {
+    const P = HC.profile, ex = P.modeEx;
+    if (ex.length < 10 || new Set(ex.map((e) => e.y)).size < 2) { P.modeW = null; return; }
+    const d = ex[0].f.length + 1, W = MODES.map(() => new Array(d).fill(0));
+    for (let ep = 0; ep < 300; ep++) for (const e of ex) {
+      const x = [...e.f, 1], z = W.map((w) => w.reduce((s, v, k) => s + v * x[k], 0)), m = Math.max(...z);
+      const ez = z.map((v) => Math.exp(v - m)), sum = ez.reduce((a, b) => a + b, 0);
+      MODES.forEach((mo, j) => { const g = ez[j] / sum - (mo === e.y ? 1 : 0); for (let k = 0; k < d; k++) W[j][k] -= 0.05 * (g * x[k] + 0.002 * W[j][k]); });
+    }
+    P.modeW = W;
+  }
+  /* 這段畫面適合哪種效果：{in: 0.4, panR: 0.3, ...}，加總 1 */
+  HC.modePref = (look, type) => {
+    if (!look) return null;
+    const W = HC.profile.modeW;
+    let p;
+    if (W) {
+      const x = [...modeFeat(look.f, type), 1], z = W.map((w) => w.reduce((s, v, k) => s + v * x[k], 0)), m = Math.max(...z);
+      const ez = z.map((v) => Math.exp(v - m)), sum = ez.reduce((a, b) => a + b, 0);
+      p = Object.fromEntries(MODES.map((mo, j) => [mo, ez[j] / sum]));
+    } else {
+      const r = rulePref(look.f), sum = Object.values(r).reduce((a, b) => a + b, 0);
+      p = Object.fromEntries(MODES.map((mo) => [mo, r[mo] / sum]));
+    }
+    p._learned = !!W;
+    return p;
+  };
+
+  /* ---------- 場景類型（庭園／室內／其他） ---------- */
+  HC.SCENE_TYPES = { "": "未分類", garden: "庭園", indoor: "室內", other: "其他" };
+  const meanSig = (clips) => { const xs = clips.map((c) => c.ana && c.ana.sig).filter(Boolean); return xs.length ? xs[0].map((_, k) => xs.reduce((s, x) => s + x[k], 0) / xs.length) : null; };
+  /* 一個場景的類型：你標的 > 依學過的色彩猜 */
+  HC.sceneType = (scene) => {
+    const cs = HC.state.clips.filter((c) => c.scene === scene);
+    const set = cs.find((c) => c.stype);
+    if (set) return { type: set.stype, guess: false };
+    const sg = meanSig(cs), T = HC.profile.typeSig;
+    let best = "", bd = 0.3;
+    for (const [t, v] of Object.entries(T)) { const d = HC.sigDiff(sg, v); if (d < bd) { bd = d; best = t; } }
+    return { type: best, guess: !!best };
+  };
+  HC.clipType = (clipId) => { const c = HC.clip(clipId); return c ? HC.sceneType(c.scene || 0).type : ""; };
+  HC.setSceneType = (scene, type) => {
+    const cs = HC.state.clips.filter((c) => c.scene === scene);
+    for (const c of cs) c.stype = type;
+    const sg = meanSig(cs);
+    if (type && sg) { HC.snapshotProfile(); const T = HC.profile.typeSig; T[type] = T[type] ? T[type].map((v, k) => v * 0.6 + sg[k] * 0.4) : sg; HC.saveProfile(); }
+  };
+  /* 某個類型學到的風格（沒有就用整體風格） */
+  HC.styleFor = (type) => { const st = HC.profile.style, b = type && HC.profile.byType[type]; return b && b.n ? { ...st, ...b, modes: b.modes || st.modes } : st; };
+
+  /* ---------- 👍／👎 與「換一個」 ---------- */
+  HC.feedback = (s, val, w = 3) => {
+    const f = HC.features(s.clipId, s.start, s.start + s.dur, s.mode === "move");
+    if (!f) return false;
+    HC.snapshotProfile();
+    const P = HC.profile;
+    P.examples.push({ f, y: val > 0 ? 1 : 0, w });
+    if (P.examples.length > 600) P.examples = P.examples.slice(-600);
+    train(); HC.saveProfile();
+    return true;
+  };
+
   /* ---------- 從手動修改學習 ---------- */
   HC.markAuto = () => {
     HC.lastAuto = HC.state.shots.map((s) => ({ ...s, f: HC.features(s.clipId, s.start, s.start + s.dur, s.mode === "move") }));
   };
-  HC.timelineHash = () => JSON.stringify(HC.state.shots.map((s) => [s.clipId, s.start, s.dur, s.mode, s.zoom, s.speed, s.tr && s.tr.type]));
+  HC.timelineHash = () => JSON.stringify(HC.state.shots.map((s) => [s.clipId, s.start, s.dur, s.mode, s.zoom, s.speed, s.tr && s.tr.type, s.fx, s.fy]));
   HC.learnFromEdits = () => {
     const P = HC.profile, shots = HC.state.shots, auto = HC.lastAuto || [];
     const h = HC.timelineHash();
     if (h === P.lastHash) return { ok: false, why: "這版已經學過了" };
-    const autoHash = JSON.stringify(auto.map((s) => [s.clipId, s.start, s.dur, s.mode, s.zoom, s.speed, s.tr && s.tr.type]));
+    const autoHash = JSON.stringify(auto.map((s) => [s.clipId, s.start, s.dur, s.mode, s.zoom, s.speed, s.tr && s.tr.type, s.fx, s.fy]));
     if (auto.length && h === autoHash) return { ok: false, why: "時間軸跟自動剪輯的結果一樣，沒有修改可以學" };
+    HC.snapshotProfile();
     const ov = (x, y) => x.clipId === y.clipId && Math.min(x.start + x.dur, y.start + y.dur) - Math.max(x.start, y.start) > 0.5 * Math.min(x.dur, y.dur);
     let kept = 0, del = 0, add = 0;
     for (const a of auto) {
@@ -191,6 +324,37 @@
     if (P.examples.length > 600) P.examples = P.examples.slice(-600);
     const obs = styleOf(shots);
     if (obs) blend(obs, W_EDIT);
+    // 細部修改：和自動剪輯原本給的比，頭尾裁了多少、縮放改多少
+    const F = P.fine, heads = [], tails = [], zooms = {};
+    for (const s of shots) {
+      const o = s.orig; if (!o) continue;
+      if (s.mode === "move" && o.mode === "move" && Math.abs(s.start - o.start) < 3) { heads.push(s.start - o.start); tails.push(o.start + o.dur - (s.start + s.dur)); }
+      if (s.mode !== "move" && s.zoom > 0) (zooms[s.mode] = zooms[s.mode] || []).push(s.zoom);
+    }
+    if (heads.length >= 2) { const a = F.n ? W_EDIT : 1; F.trimHead = F.trimHead * (1 - a) + HC.clamp(median(heads), -1, 3) * a; F.trimTail = F.trimTail * (1 - a) + HC.clamp(median(tails), -1, 3) * a; F.n++; }
+    for (const [m, z] of Object.entries(zooms)) F.zoomBy[m] = F.zoomBy[m] ? F.zoomBy[m] * (1 - W_EDIT) + median(z) * W_EDIT : median(z);
+    // 畫面內容 → 效果：最後時間軸上每個靜止鏡頭用了什麼效果
+    for (const s of shots) {
+      if (s.mode === "move" || s.mode === "none") continue;
+      const lk = HC.shotLook(s.clipId, s.start, s.start + s.dur);
+      if (lk) P.modeEx.push({ f: modeFeat(lk.f, HC.clipType(s.clipId)), y: s.mode });
+    }
+    if (P.modeEx.length > 400) P.modeEx = P.modeEx.slice(-400);
+    trainModes();
+    // 依場景類型：各類型的鏡頭各自統計風格
+    const byT = {};
+    for (const s of shots) { const t = HC.clipType(s.clipId); if (t) (byT[t] = byT[t] || []).push(s); }
+    for (const [t, list] of Object.entries(byT)) {
+      const o = styleOfSubset(list);
+      if (!o) continue;
+      const b = (P.byType[t] = P.byType[t] || { n: 0 }), a = b.n ? W_EDIT : 1;
+      for (const [k, v] of Object.entries(o)) {
+        if (v == null) continue;
+        if (k === "modes") { b.modes = b.modes || {}; mixDist(b.modes, v, a); }
+        else b[k] = b[k] != null ? b[k] * (1 - a) + v * a : v;
+      }
+      b.n++;
+    }
     countLook();
     P.edits++; P.lastHash = h;
     train(); HC.saveProfile();
@@ -263,6 +427,7 @@
     obs.trDur = {};
     if (trc.black) obs.trDur.black = 1.2;
     if (trc.fade) obs.trDur.fade = 1.0;
+    HC.snapshotProfile();
     blend(obs, W_REF);
     const summary = { name: file.name, dur: c.dur, shots: shots.length, avg: total / shots.length, dips: (trc.black || 0) / (shots.length - 1), fades: (trc.fade || 0) / (shots.length - 1), moveRatio: obs.moveRatio, zoom: obs.zoom, modes };
     HC.profile.refs.push(summary);

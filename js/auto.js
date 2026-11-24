@@ -121,11 +121,11 @@
     const order = new Map(clips.map((c, i) => [c.id, i]));
     let cands = [];
     for (const c of clips) cands = cands.concat(HC.segmentClip(c, opt));
-    // 依學到的偏好調整分數：運鏡／靜止的比例，以及「你通常會留下哪種片段」
+    // 依學到的偏好調整分數：運鏡／靜止的比例（依場景類型），以及「你通常會留下哪種片段」
     if (L) {
-      const fMove = HC.clamp(L.moveRatio / 0.45, 0.4, 2.2);
       for (const x of cands) {
-        if (x.type === "M") x.score *= fMove;
+        const Lt = HC.styleFor(HC.clipType(x.clipId));
+        if (x.type === "M") x.score *= HC.clamp(Lt.moveRatio / 0.45, 0.4, 2.2);
         const p = HC.predict(HC.features(x.clipId, x.a, x.b, x.type === "M"));
         if (p != null) { x.p = p; x.score *= 0.4 + 1.2 * p; }
       }
@@ -137,7 +137,7 @@
     if (opt.cover) {
       for (const c of clips) {
         const mine = cands.filter((x) => x.clipId === c.id).sort((p, q) => q.score - p.score);
-        if (mine.length) { picked.push(mine[0]); total += nominal(mine[0]); }
+        if (mine.length) { mine[0].cover = true; picked.push(mine[0]); total += nominal(mine[0]); }
       }
     }
     // 每支素材最多用幾個鏡頭（學到你通常一支素材用幾個）
@@ -150,37 +150,69 @@
     }
     picked.sort((p, q) => (order.get(p.clipId) - order.get(q.clipId)) || (p.a - q.a));
 
-    // 效果輪流使用；有學習資料時，依你常用的效果比例分配
-    const W = L ? L.modes : { in: 2, panR: 1, out: 2, panL: 1 };
+    // 效果：照你常用的比例輪流（可依場景類型），再看畫面內容調整（細節集中 → 推近、一邊細節多 → 平移）
     const used = {};
-    const nextMode = () => {
+    const nextMode = (W, pref) => {
       let best = "in", bs = -Infinity;
       const tot = Object.values(W).reduce((a, b) => a + b, 0) || 1, n = Object.values(used).reduce((a, b) => a + b, 0) + 1;
-      for (const [m, w] of Object.entries(W)) { if (w <= 0.02) continue; const sc = (w / tot) * n - (used[m] || 0); if (sc > bs) { bs = sc; best = m; } }
+      for (const [m, w] of Object.entries(W)) {
+        if (w <= 0.02 && !(pref && pref[m] > 0.35)) continue;
+        const sc = (w / tot) * n - (used[m] || 0) + (pref ? 1.2 * (pref[m] || 0) : 0);
+        if (sc > bs) { bs = sc; best = m; }
+      }
       used[best] = (used[best] || 0) + 1;
       return best;
     };
+    const fine = L && HC.profile.fine && HC.profile.fine.n ? HC.profile.fine : null;
+    const MN = { in: "推近", out: "拉遠", panR: "向右平移", panL: "向左平移", panU: "向上平移", panD: "向下平移" };
     let acc = 0.5;
     const shots = [];
     picked.forEach((x, idx) => {
+      const type = HC.clipType(x.clipId), Lt = L ? HC.styleFor(type) : null, why = [];
+      if (x.cover) why.push("這支素材分數最高的片段（每支素材至少用一個）");
+      if (x.p != null && x.p >= 0.6) why.push(`跟你保留過的片段很像（${Math.round(x.p * 100)}%）`);
+      if (x.p != null && x.p < 0.35) why.push("模型覺得普通，但素材不夠只好用");
+      if (Lt && type && HC.profile.byType[type] && HC.profile.byType[type].n) why.push(`套用你的「${HC.SCENE_TYPES[type]}」風格`);
       if (x.type === "M") {
-        const sh = mk(x.clipId, x.a, x.b - x.a, "move", 0, opt.speed);
+        let a = x.a, b = x.b;
+        // 學到你習慣把運鏡頭尾裁掉一點
+        if (fine && b - a > T.minMove + 0.5) { a += HC.clamp(fine.trimHead, 0, (b - a) * 0.25); b -= HC.clamp(fine.trimTail, 0, (b - a) * 0.25); if (fine.trimHead > 0.1 || fine.trimTail > 0.1) why.push("頭尾照你的習慣裁掉一點"); }
+        const sh = mk(x.clipId, a, b - a, "move", 0, Lt ? [0.6, 0.8, 1].reduce((bb, v) => Math.abs(v - Lt.moveSpeed) < Math.abs(bb - Lt.moveSpeed) ? v : bb, opt.speed) : opt.speed);
         sh.stab = !!opt.stab; sh.stabStr = opt.stabStr;
+        why.unshift(x.lateral ? "橫向運鏡，畫面" + (x.smooth > 0.75 ? "穩" : "還算穩") : x.smooth > 0.75 ? "畫面穩的運鏡" : "運鏡");
+        const lk = HC.shotLook(x.clipId, a, b); if (lk) { sh.afx = lk.focus[0]; sh.afy = lk.focus[1]; }
+        sh.why = why;
         shots.push(sh);
         return;
       }
       let short = false;
       if (idx > 0) { acc += opt.rhythm; if (acc >= 1) { short = true; acc -= 1; } }
-      const want = short ? T.shortStill : T.longStill;
+      const longS = Lt ? HC.clamp(Lt.longStill, 3, 12) : T.longStill, shortS = Lt ? HC.clamp(Lt.shortStill, 1.5, 4) : T.shortStill;
+      const want = short ? shortS : longS;
       const len = Math.min(x.b - x.a, want);
       const a = x.a + (x.b - x.a - len) / 2;
-      let mode = idx === 0 ? "in" : nextMode();
-      shots.push(mk(x.clipId, a, len, mode, short ? Math.min(0.35, opt.zoom * 1.3) : opt.zoom, 1));
+      const look = HC.shotLook(x.clipId, a, a + len), pref = HC.modePref(look, type);
+      const W = (Lt && Lt.modes) || { in: 2, panR: 1, out: 2, panL: 1 };
+      const mode = idx === 0 ? "in" : nextMode(W, pref);
+      why.unshift(`靜止畫面${short ? "（短鏡頭，做節奏）" : ""}`);
+      if (pref && idx) {
+        const top = Object.entries(pref).filter(([k]) => k[0] !== "_").sort((p, q) => q[1] - p[1])[0][0];
+        if (top === mode) why.push(pref._learned ? `這種畫面你通常用「${MN[mode]}」` : mode === "in" ? "細節集中在中間 → 推近" : mode === "out" ? "畫面細節很平均 → 拉遠" : `${mode === "panR" || mode === "panD" ? "右邊／下面" : "左邊／上面"}細節比較多 → ${MN[mode]}`);
+      }
+      const zBase = fine && fine.zoomBy[mode] ? fine.zoomBy[mode] : Lt ? HC.clamp(Lt.zoom, 0.04, 0.3) : opt.zoom;
+      const sh = mk(x.clipId, a, len, mode, short ? Math.min(0.35, zBase * 1.3) : zBase, 1);
+      if (look) { sh.afx = look.focus[0]; sh.afy = look.focus[1]; if (mode === "in" || mode === "out") why.push("推近的目標點對準細節最多的地方"); }
+      sh.why = why;
+      shots.push(sh);
     });
     // 順序：照拍攝時間，或依學到的「靜止／運鏡」接法重新排（只在同一段場景內調整）
     const ordered = HC.orderShots(shots, opt, L);
     // 轉場：依學到的偏好、或你指定的轉場
     HC.assignTransitions(ordered, opt, L);
+    // 剪接點對齊音樂拍點
+    if (opt.beat && HC.snapToBeats) HC.snapToBeats(ordered);
+    for (const s of ordered) { if (s._beat && s.why) s.why.push("結尾對齊音樂拍點"); delete s._beat; }
+    for (const s of ordered) s.orig = { start: s.start, dur: s.dur, mode: s.mode, zoom: s.zoom, speed: s.speed };
     S.shots = ordered;
     HC.markAuto && HC.markAuto();
     return ordered;
@@ -230,6 +262,39 @@
     return k + 1;
   };
   const sceneOf = (clipId) => { const c = HC.clip(clipId); return c && c.scene != null ? c.scene : 0; };
+
+  /* ---------- 換一個：同一支素材（不夠就同一個場景）裡，挑還沒用到、分數最高的片段 ---------- */
+  HC.swapShot = (s) => {
+    const S = HC.state, opt = S.auto, c = HC.clip(s.clipId);
+    if (!c || !c.ana) return null;
+    const pool = [c, ...S.clips.filter((x) => x !== c && x.ana && x.scene === c.scene)];
+    const rejected = [...(s.rejected || []), [s.clipId, s.start, s.start + s.dur]];
+    // 片段裡還沒被其他鏡頭（和你換掉過的）用到的部分
+    const free = (x) => {
+      let parts = [[x.a, x.b]];
+      const used = [...S.shots.filter((o) => o !== s && o.clipId === x.clipId).map((o) => [o.start - 0.5, o.start + o.dur + 0.5]), ...rejected.filter((r) => r[0] === x.clipId).map((r) => [r[1] - 0.3, (r[2] || r[1] + 2) + 0.3])];
+      for (const [ua, ub] of used) parts = parts.flatMap(([a, b]) => (ub <= a || ua >= b ? [[a, b]] : [[a, Math.min(b, ua)], [Math.max(a, ub), b]]));
+      const min = x.type === "M" ? HC.TUNE.minMove : HC.TUNE.minStill;
+      return parts.filter(([a, b]) => b - a >= min).map(([a, b]) => ({ ...x, a, b, score: x.score * (b - a) / (x.b - x.a) }));
+    };
+    for (const cl of pool) {
+      const cands = HC.segmentClip(cl, opt).flatMap(free);
+      for (const x of cands) { const p = HC.predict(HC.features(x.clipId, x.a, x.b, x.type === "M")); if (p != null) x.score *= 0.4 + 1.2 * p; }
+      cands.sort((p, q) => q.score - p.score);
+      const x = cands[0];
+      if (!x) continue;
+      const out = HC.outDur(s), isMove = x.type === "M";
+      const len = isMove ? Math.min(x.b - x.a, Math.max(2, out * opt.speed * 1.3)) : Math.min(x.b - x.a, out);
+      const a = x.a + (x.b - x.a - len) / 2, look = HC.shotLook(x.clipId, a, a + len);
+      return {
+        clipId: x.clipId, start: +a.toFixed(2), dur: +len.toFixed(2), mode: isMove ? "move" : s.mode === "move" ? "in" : s.mode,
+        zoom: isMove ? 0 : s.zoom || opt.zoom, speed: isMove ? opt.speed : 1, stab: isMove && !!opt.stab,
+        afx: look ? look.focus[0] : undefined, afy: look ? look.focus[1] : undefined,
+        rejected: rejected.slice(-20), why: ["你按了「換一個」：這是同一" + (x.clipId === s.clipId ? "支素材" : "個場景") + "裡還沒用到、分數最高的片段"],
+      };
+    }
+    return null;
+  };
 
   /* ---------- 順序 ---------- */
   const scenes = (shots) => {

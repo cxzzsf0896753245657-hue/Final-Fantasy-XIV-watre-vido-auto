@@ -183,7 +183,7 @@ function installEffects() {
   /* uMul：縮圖用，把光點、花瓣放大一點才看得清楚 */
   HC.drawEffects = (ctx, W, H, T, fx, frame, uMul = 1) => {
     if (!fx) return;
-    const u = H / 1080 * uMul;
+    const u = Math.min(W, H) / 1080 * uMul;   // 直式畫面用短邊算大小
     if (fx.glow && frame) {
       glowC = glowC || document.createElement("canvas");
       glowC.width = Math.round(W / 6); glowC.height = Math.round(H / 6);
@@ -290,7 +290,7 @@ function installEffects() {
 
   /* 版面：算出每個字的位置（canvas 用） */
   function layout(ctx, W, H, o, tpl) {
-    const u = H / 1080, size = o.size * u, sub = Math.round(size * 0.43), info = Math.round(size * 0.32);
+    const u = Math.min(W, H) / 1080, size = o.size * u * (W < H ? 0.9 : 1), sub = Math.round(size * 0.43), info = Math.round(size * 0.32);
     const font = (w, s) => `${w} ${s}px "${o.font}", "Noto Serif TC", serif`;
     const lines = [];
     const mk = (text, w, s) => { ctx.font = font(w, s); const chars = [...(text || "")]; let x = 0; const out = chars.map((ch) => { const c = { ch, x0: x }; x += ctx.measureText(ch).width; return c; }); return { chars: out, width: x, font: font(w, s), size: s }; };
@@ -397,7 +397,7 @@ function installEffects() {
   HC.drawCaption = (ctx, W, H, text, lt, od, font) => {
     const a = lt < 0.6 ? 0 : lt < 1.3 ? (lt - 0.6) / 0.7 : lt < od - 0.4 - 0.7 ? 1 : lt < od - 0.4 ? (od - 0.4 - lt) / 0.7 : 0;
     if (a <= 0) return;
-    const u = H / 1080;
+    const u = Math.min(W, H) / 1080;
     ctx.save();
     ctx.globalAlpha = a * 0.92; ctx.textAlign = "center";
     ctx.shadowColor = "rgba(0,0,0,.6)"; ctx.shadowBlur = 8 * u; ctx.shadowOffsetX = 2 * u; ctx.shadowOffsetY = 2 * u;

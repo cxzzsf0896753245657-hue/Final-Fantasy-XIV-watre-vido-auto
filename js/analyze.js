@@ -4,6 +4,7 @@
    - dx / dy：鏡頭往哪個方向移動（用來找出橫向運鏡）
    - luma：亮度（太暗的黑畫面會被避開）
    - cursor：每 0.3 秒用原尺寸畫面找一次白色滑鼠游標
+   - grid：每 0.5 秒一次，畫面切成 4×4 格，每格的細節量（邊緣多寡）。用來找推近的目標點、決定推近還是平移
    - sig：整支素材的色彩特徵（色相＋亮度分布），用來判斷兩支素材是不是同一個場景（例如庭園 vs 室內）
    - ui：遊戲介面（快捷列、聊天框、小地圖…）。鏡頭在動的時候，畫面上還是固定不動、有紋理的區塊就是介面
 */
@@ -13,6 +14,7 @@
   const CW = 1920, CH = 1080;     // 找游標用的原尺寸畫面（游標很小，縮圖會看不到）
   /* 游標白色部分在 1080p 畫面中的大小範圍（Windows 預設游標、100% 縮放約 9×15 像素）
      如果你的 Windows 顯示縮放比較大、游標被漏掉，可以把這些數字放大 */
+  HC.ANA_VER = 3;   // 分析結果的版本：改了分析內容就加 1，瀏覽器裡存的舊結果會重新分析
   HC.CURSOR = { minArea: 40, maxArea: 110, minW: 6, maxW: 12, minH: 10, maxH: 19, minRatio: 1.3, maxRatio: 2.4 };
 
   HC.analyzeClip = async (clip, onProgress, opts = {}) => {
@@ -27,12 +29,12 @@
     const cc = document.createElement("canvas"); cc.width = CW; cc.height = CH;
     const cx = cc.getContext("2d", { willReadFrequently: true });
 
-    const A = { t: [], m: [], dx: [], dy: [], luma: [], curT: [], blk: [], zm: [] };
+    const A = { t: [], m: [], dx: [], dy: [], luma: [], curT: [], blk: [], zm: [], gt: [], grid: [] };
     let prev = null, prevT = -1, lastCur = -1, lastSig = -1;
     const sigAcc = new Float64Array(HC.SIG_BINS);
 
-    const take = (t) => {
-      sx.drawImage(v, 0, 0, SW, SH);
+    const take = (t, src = v) => {
+      sx.drawImage(src, 0, 0, SW, SH);
       const d = sx.getImageData(0, 0, SW, SH).data;
       const g = new Uint8Array(SW * SH);
       let sum = 0;
@@ -51,18 +53,21 @@
         }
       }
       prev = g; prevT = t;
-      if (!opts.ref && t - lastSig >= 0.5) { lastSig = t; HC.colorSig(d, sigAcc); }
+      if (!opts.ref && t - lastSig >= 0.5) { lastSig = t; HC.colorSig(d, sigAcc); A.gt.push(+t.toFixed(2)); A.grid.push(detailGrid(g)); }
       if (!opts.ref && t - lastCur >= 0.3) {   // 參考影片不需要找游標
         lastCur = t;
-        cx.drawImage(v, 0, 0, CW, CH);
+        cx.drawImage(src, 0, 0, CW, CH);
         if (HC.findCursor(cx.getImageData(0, 0, CW, CH))) A.curT.push(t);
       }
       onProgress && onProgress(Math.min(1, t / clip.dur));
     };
 
+    const reset = () => { sigAcc.fill(0); lastSig = -1; for (const k of Object.keys(A)) A[k].length = 0; prev = null; lastCur = -1; };
     let ok = false;
-    if ("requestVideoFrameCallback" in v) ok = await viaFrames(v, take, clip.dur);
-    if (!ok) { sigAcc.fill(0); lastSig = -1; A.t.length = A.m.length = A.dx.length = A.dy.length = A.luma.length = A.curT.length = A.blk.length = A.zm.length = 0; prev = null; lastCur = -1; await viaSeek(v, take, clip.dur); }
+    // 一般 MP4：直接依序解碼（不用即時播放，電腦多快就多快）；其他格式：4 倍速播放取樣
+    if (clip.file && HC.mp4Index) ok = await viaDecoder(clip, take).catch(() => false);
+    if (!ok) { reset(); if ("requestVideoFrameCallback" in v) ok = await viaFrames(v, take, clip.dur); }
+    if (!ok) { reset(); await viaSeek(v, take, clip.dur); }
 
     A.cursor = ranges(A.curT, 0.6, 0.45);
     if (!opts.ref) A.sig = HC.normSig(sigAcc);
@@ -72,6 +77,17 @@
     v.removeAttribute("src"); v.load();
     return A;
   };
+
+  /* 4×4 格的細節量：相鄰像素亮度差的平均 */
+  function detailGrid(g) {
+    const out = new Array(16).fill(0), cw = SW / 4, ch = SH / 4;
+    for (let y = 1; y < SH - 1; y += 2) for (let x = 1; x < SW - 1; x += 2) {
+      const i = y * SW + x, e = Math.abs(g[i + 1] - g[i - 1]) + Math.abs(g[i + SW] - g[i - SW]);
+      out[Math.min(3, Math.floor(y / ch)) * 4 + Math.min(3, Math.floor(x / cw))] += e;
+    }
+    const n = (cw / 2) * (ch / 2);
+    return out.map((v) => +(v / n).toFixed(1));
+  }
 
   /* ---------- 色彩特徵 ----------
      12 格色相（依飽和度加權）＋ 8 格亮度。兩個場景的分布差很多（庭園偏綠、天空藍；室內偏暖、偏暗）就算不同場景 */
@@ -101,6 +117,24 @@
     for (let i = HUE; i < HUE + LUM; i++) l += Math.min(x[i], y[i]);
     return 1 - (h + l) / 2;
   };
+
+  /* 最快：讀 MP4 目錄依序解碼每一格，每 0.1 秒取一張 */
+  async function viaDecoder(clip, take) {
+    const ix = await HC.mp4Index(clip.file);
+    if (!ix) return false;
+    const src = HC.decodeSource(clip.file, ix, 0);
+    let last = -1, n = 0, k = 0;
+    try {
+      for (;;) {
+        const fr = await src.nextFrame();
+        if (!fr) break;
+        const t = fr.timestamp / 1e6;
+        if (t - last >= 0.1) { take(t, fr); last = t; n++; }
+        if (++k % 40 === 0) await new Promise((r) => setTimeout(r, 0));   // 讓畫面有機會更新進度
+      }
+    } finally { src.close(); }
+    return n > 4 && last > clip.dur * 0.8;
+  }
 
   /* 快速：4 倍速播放並在每個解碼出的畫面取樣 */
   function viaFrames(v, take, dur) {
