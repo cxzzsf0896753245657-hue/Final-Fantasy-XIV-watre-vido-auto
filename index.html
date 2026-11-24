@@ -226,7 +226,8 @@
     </div>
 
     <div class="pane" id="pane-music">
-      <label class="btn wide" for="musicIn">選擇背景音樂</label>
+      <h3 class="sub">背景音樂</h3>
+      <div class="btnrow"><button class="btn" id="libMusicBtn">從音樂庫挑</button><label class="btn" for="musicIn">用自己的音樂檔</label></div>
       <input id="musicIn" type="file" accept="audio/*" hidden>
       <p id="musicName" class="muted">尚未選擇（不選就輸出無聲影片）</p>
       <label>音量 <output id="mVolV"></output><input id="mVol" type="range" min="0" max="100" value="80"></label>
@@ -235,6 +236,22 @@
       <p class="hint" id="mBeat"></p>
       <button class="btn" id="mSnap" disabled>把剪接點對齊拍點</button>
       <button class="btn" id="mClear">移除音樂</button>
+
+      <h3 class="sub">環境音效 <small class="muted">最多 3 層，整支影片循環播放</small></h3>
+      <div id="ambList"></div>
+      <div class="btnrow"><button class="btn" id="libSfxBtn">從音效庫加入</button><label class="btn" for="ambIn">用自己的音效檔</label></div>
+      <input id="ambIn" type="file" accept="audio/*" hidden>
+
+      <section class="lib hidden" id="lib" aria-label="免費音樂與音效庫">
+        <div class="libhead">
+          <div class="seg" role="tablist"><button role="tab" data-kind="music" aria-selected="true">音樂</button><button role="tab" data-kind="sfx" aria-selected="false">音效</button></div>
+          <button class="btn" id="libClose" aria-label="關閉音樂庫">關閉</button>
+        </div>
+        <input id="libQ" type="search" placeholder="搜尋，例如：蕭邦、雨、溪流">
+        <div class="chips" id="libCats"></div>
+        <div class="liblist" id="libList"></div>
+        <p class="hint" id="libNote"></p>
+      </section>
     </div>
 
     <div class="pane" id="pane-learn">
@@ -309,6 +326,7 @@
 <script src="js/effects.js"></script>
 <script src="js/hyperframes.js"></script>
 <script src="js/beats.js"></script>
+<script src="js/library.js"></script>
 <script src="js/auto.js"></script>
 <script src="js/render.js"></script>
 <script src="js/vendor/mp4-muxer.min.js"></script>

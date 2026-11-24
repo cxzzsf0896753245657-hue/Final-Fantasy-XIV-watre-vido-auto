@@ -27,7 +27,7 @@
       modes: { in: 1, out: 1, panR: 1, panL: 1, panU: 0.1, panD: 0.1 },
       order: { n: 0, chrono: 1, firstS: 1, seq: { SS: 0.5, SM: 0.5, MS: 0.5, MM: 0.5 } },
       tr: { same: { cut: 1 }, change: { cut: 1 }, gap: { black: 1 } }, trDur: {} },
-    look: { opening: {}, ending: {}, filter: {}, fx: {} },
+    look: { opening: {}, ending: {}, filter: {}, fx: {}, music: {}, amb: {} },
     refs: [], examples: [], w: null,
     fine: { n: 0, trimHead: 0, trimTail: 0, zoomBy: {} },   // 細部修改
     modeEx: [], modeW: null,                                // 畫面內容 → 效果
@@ -200,6 +200,11 @@
     inc(L.opening, S.title.template);
     inc(L.ending, S.ending.template);
     inc(L.filter, S.look.filter);
+    // 音樂庫：你常用哪一類音樂、哪一類環境音效（音樂庫會把常用的分類排前面）
+    L.music = L.music || {}; L.amb = L.amb || {};
+    const it = S.music.lib && HC.libItem && HC.libItem(S.music.lib);
+    if (it) inc(L.music, it.cat);
+    for (const a of S.amb) { const x = a.lib && HC.libItem && HC.libItem(a.lib); if (x) inc(L.amb, x.cat); }
   }
   HC.topOf = (m) => Object.entries(m || {}).sort((a, b) => b[1] - a[1])[0];
 

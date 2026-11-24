@@ -243,3 +243,28 @@ kbd{font:inherit;font-size:11px;padding:1px 5px;border:1px solid var(--line);bor
 .scene{flex-wrap:wrap}
 .screen.vertical{aspect-ratio:9/16;width:auto;height:calc(100vh - 330px);max-width:100%;max-height:none}
 @media (max-width:900px){.screen.vertical{height:70vh}}
+/* 音樂與音效庫 */
+h3.sub{margin:6px 0 0;font-size:13px;font-weight:600;color:var(--ink)}
+h3.sub small{font-weight:400;margin-left:6px}
+.lib{display:flex;flex-direction:column;gap:10px;margin-top:6px;padding:12px;border-radius:10px;background:var(--panel2);border:1px solid var(--line)}
+.libhead{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{font:inherit;font-size:13px;padding:6px 14px;background:none;border:0;color:var(--mute);cursor:pointer}
+.seg button[aria-selected="true"]{background:var(--accent);color:#111}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{font:inherit;font-size:12px;padding:4px 10px;border-radius:14px;border:1px solid var(--line);background:var(--panel);color:var(--mute);cursor:pointer}
+.chips button[aria-pressed="true"]{border-color:var(--accent);color:var(--ink)}
+.chips button small{opacity:.7;margin-left:4px}
+.liblist{display:flex;flex-direction:column;gap:2px;max-height:380px;overflow:auto}
+.li{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:8px;padding:6px 4px;border-radius:8px}
+.li:hover{background:var(--panel)}
+.li .pl{width:30px;height:30px;border-radius:50%;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;font-size:11px}
+.li .pl[aria-pressed="true"]{background:var(--accent);color:#111;border-color:var(--accent)}
+.li b{display:block;font-size:13px;font-weight:500;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.li span{display:block;font-size:11px;color:var(--mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.li .use{font:inherit;font-size:12px;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;white-space:nowrap}
+.li .use:hover{border-color:var(--accent)}
+.li.on .use{border-color:var(--accent);color:var(--accent)}
+.amb{display:grid;grid-template-columns:minmax(0,1fr) 90px 34px;align-items:center;gap:8px;font-size:13px;padding:4px 0}
+.amb span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.amb button{font:inherit;width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:none;color:var(--mute);cursor:pointer}

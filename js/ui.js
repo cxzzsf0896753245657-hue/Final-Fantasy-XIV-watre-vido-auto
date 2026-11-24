@@ -344,7 +344,9 @@
     $("resumeYes").onclick = async () => {
       bar.remove(); loadProject(o, true);
       const m = await HC.autosave.music();
-      if (m && m.blob) setMusic(new File([m.blob], m.name || "music"), true);
+      if (m && m.lib) { const f = await HC.libMusicFile(m.lib); if (f) setMusic(f, true, m.lib); }
+      else if (m && m.blob) setMusic(new File([m.blob], m.name || "music"), true);
+      await HC.restoreAmb(o.amb);
       if (S().clips.some((c) => c.missing)) relink();
     };
     $("resumeNo").onclick = () => { bar.remove(); HC.autosave.clear(); };
@@ -357,10 +359,11 @@
       app: "housing-cut", version: 1, name: $("projName").value,
       clips: s.clips.map((c) => ({ id: c.id, name: c.name, time: c.time, dur: c.dur, excluded: c.excluded, sceneMark: c.sceneMark || "", stype: c.stype || "" })),
       shots: s.shots, title: s.title, ending: s.ending, look: s.look, out: s.out, auto: s.auto,
-      music: { name: s.music.name, vol: s.music.vol, off: s.music.off, fade: s.music.fade },
+      music: { name: s.music.name, vol: s.music.vol, off: s.music.off, fade: s.music.fade, lib: s.music.lib || "" },
+      amb: HC.ambForSave(),
     }, null, 2);
   }
-  function loadProject(o) {
+  function loadProject(o, fromAutosave) {
     if (!o || o.app !== "housing-cut") return toast("這不是本工具的專案檔");
     R.stop();
     const s = S();
@@ -377,6 +380,11 @@
     if (o.look) { s.look.filter = o.look.filter || "none"; s.look.filterStr = o.look.filterStr ?? 1; s.look.tintStr = o.look.tintStr ?? 1; Object.assign(s.look.fx, o.look.fx || {}); }
     if (s.title.pos === "center") s.title.pos = "auto";   // 舊版的「畫面中央」= 現在的「跟模板一樣」
     Object.assign(s.music, { vol: o.music.vol, off: o.music.off, fade: o.music.fade });
+    // 開舊專案：音樂庫的音樂和音效直接從庫裡拿回來；自己的音樂檔要重新選
+    if (!fromAutosave) {
+      if (o.music.lib) HC.libMusicFile(o.music.lib).then((f) => f && setMusic(f, true, o.music.lib));
+      HC.restoreAmb((o.amb || []).filter((a) => a.lib));
+    }
     syncForms(); renderBin(); renderTimeline(); select(null);
     const miss = s.clips.filter((c) => c.missing).length;
     toast(miss ? `專案已開啟，請再匯入 ${miss} 支素材（同檔名會自動對上）` : "專案已開啟", 4000);
@@ -586,11 +594,22 @@
     document.querySelector(".screen").classList.toggle("vertical", v);
     $("oAspectHint").textContent = v ? "直式會從素材裡裁出直的一塊：每個鏡頭依「推近的目標點」決定保留哪一塊（自動找細節最多的地方，也可以在鏡頭設定裡自己點）。平移會變成左右橫掃。" : "";
   }
-  function setMusic(f, quiet) {
+  // 播放中換了音樂或環境音效：馬上換成新的聲音
+  function restartAudio() { if (R.isPlaying()) R.music.start(R.T); }
+  /* 顯示一段可以複製的文字（例如音樂來源清單） */
+  function showText(title, text) {
+    const ov = $("overlay");
+    ov.innerHTML = `<strong>${esc(title)}</strong><textarea readonly rows="12" style="width:min(640px,90vw);font:12px/1.6 inherit">${esc(text)}</textarea><div class="btnrow"><button class="btn" id="stCopy">複製</button><button class="btn" id="stClose">關閉</button></div>`;
+    ov.classList.remove("hidden");
+    $("stCopy").onclick = () => navigator.clipboard.writeText(text).then(() => toast("已複製"), () => toast("請手動選取文字複製"));
+    $("stClose").onclick = () => ov.classList.add("hidden");
+  }
+  function setMusic(f, quiet, libId) {
     if (S().music.url) URL.revokeObjectURL(S().music.url);
-    S().music.url = URL.createObjectURL(f); S().music.name = f.name; S().music.file = f;
-    $("musicName").textContent = f.name;
-    HC.autosave.saveMusic(f);
+    S().music.url = URL.createObjectURL(f); S().music.name = f.name; S().music.file = f; S().music.lib = libId || "";
+    $("musicName").textContent = (libId ? "音樂庫：" : "") + f.name.replace(/\.[^.]+$/, "");
+    HC.autosave.saveMusic(f, libId);
+    restartAudio();
     renderBeatInfo();
     HC.analyzeBeats(f).then(() => { renderTimeline(); renderBeatInfo(); });
     if (!quiet) toast("已加入音樂，按播放試聽");
@@ -901,7 +920,7 @@
       const f = e.target.files[0]; e.target.value = ""; if (!f) return;
       setMusic(f);
     });
-    $("mClear").onclick = () => { R.stop(); if (S().music.url) URL.revokeObjectURL(S().music.url); S().music.url = ""; S().music.name = ""; S().music.file = null; HC.autosave.clearMusic(); HC.analyzeBeats(null); renderTimeline(); renderBeatInfo(); $("musicName").textContent = "尚未選擇（不選就輸出無聲影片）"; };
+    $("mClear").onclick = () => { R.stop(); if (S().music.url) URL.revokeObjectURL(S().music.url); S().music.url = ""; S().music.name = ""; S().music.lib = ""; S().music.file = null; HC.autosave.clearMusic(); HC.analyzeBeats(null); renderTimeline(); renderBeatInfo(); $("musicName").textContent = "尚未選擇（不選就輸出無聲影片）"; };
     bindVal("mVol", (t) => S().music.vol = t.value / 100); bindVal("mOff", (t) => { S().music.off = Math.max(0, +t.value || 0); renderTimeline(); }, "change"); bindVal("mFade", (t) => S().music.fade = Math.max(0, +t.value || 0), "change");
 
     // 匯出設定
@@ -995,6 +1014,7 @@
 
     fillSelects(); applyLearnedLook();
     syncForms(); renderBin(); renderTimeline(); renderLearn();
+    HC.initLibrary({ toast, setMusic, restart: restartAudio, showText });
     HC.autosave.start(projectJSON);
     offerResume();
     fontsReady().then(refresh);

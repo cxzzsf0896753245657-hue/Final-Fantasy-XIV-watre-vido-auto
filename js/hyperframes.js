@@ -53,6 +53,16 @@
     const fileOf = new Map(used.map((c, i) => [c.id, `assets/clip${String(i + 1).padStart(2, "0")}.${extOf(c.name, "mp4")}`]));
     const hasMusic = !!S.music.url;
     const musicFile = hasMusic ? `assets/music.${extOf(S.music.name, "mp3")}` : null;
+    // 環境音效：依長度重複排好幾段，做出循環
+    const amb = S.amb.filter((a) => a.dur > 0).map((a, k) => ({ ...a, file: `assets/ambience${k + 1}.${a.ext || "webm"}` }));
+    const ambTags = amb.map((a, k) => {
+      const out = [];
+      for (let t = 0, j = 0; t < total - 0.05; t += a.dur, j++) {
+        const d = Math.min(a.dur, total - t);
+        out.push(`  <audio id="amb${k + 1}_${j}" data-start="${r3(t)}" data-duration="${r3(d)}" data-track-index="${5 + k}" data-media-start="0" data-volume="${a.vol}"${t === 0 ? ` data-fade-in="1.5"` : ""}${t + d >= total - 0.05 ? ` data-fade-out="${Math.max(1.5, S.music.fade)}"` : ""} src="${a.file}"></audio>`);
+      }
+      return out.join("\n");
+    }).join("\n");
 
     // 防抖：每個鏡頭每 1/30 秒的補償位移
     const stabKeys = {};
@@ -109,6 +119,7 @@ ${clipsHtml}
   <div id="trov"></div>
   <canvas id="ov" class="clip" data-start="0" data-duration="${r3(total)}" data-track-index="3" width="${W}" height="${H}"></canvas>
 ${hasMusic ? `  <audio id="music" data-start="0" data-duration="${r3(total)}" data-track-index="4" data-media-start="${r3(S.music.off)}" data-volume="${S.music.vol}" data-fade-in="0.5" data-fade-out="${S.music.fade}" src="${musicFile}"></audio>` : ""}
+${ambTags}
 </div>
 <script>
 /* 轉場、濾鏡、特效、開頭／片尾：和「房屋影片自動剪輯」網頁同一份程式 */
@@ -173,6 +184,7 @@ ${includeClips ? "素材已放在 assets/ 裡。" : "**這份匯出沒有包含�
 |---|---|
 ${used.map((c) => `| ${c.name} | ${fileOf.get(c.id)} |`).join("\n")}
 ${hasMusic ? `| ${S.music.name} | ${musicFile} |` : ""}
+${amb.map((a) => `| ${a.name}（環境音效，循環） | ${a.file} |`).join("\n")}
 
 ## 想再修改
 
@@ -192,6 +204,8 @@ ${hasMusic ? `| ${S.music.name} | ${musicFile} |` : ""}
       for (const c of used) files.push({ name: fileOf.get(c.id), data: c.file || (await (await fetch(c.url)).blob()) });
       if (hasMusic) files.push({ name: musicFile, data: S.music.file || (await (await fetch(S.music.url)).blob()) });
     }
+    // 環境音效檔很小，一律放進去
+    for (const a of amb) files.push({ name: a.file, data: await (await fetch(a.url)).blob() });
     const root = name.replace(/[\\/:*?"<>|]/g, "_") + "-hyperframes/";
     return zip(files.map((f) => ({ ...f, name: root + f.name })), onProgress);
   };

@@ -1,0 +1,1222 @@
+{
+ "cats": [
+  {
+   "id": "orchestral",
+   "kind": "music",
+   "name": "管弦樂"
+  },
+  {
+   "id": "piano",
+   "kind": "music",
+   "name": "鋼琴"
+  },
+  {
+   "id": "chamber",
+   "kind": "music",
+   "name": "室內樂・弦樂"
+  },
+  {
+   "id": "guitar",
+   "kind": "music",
+   "name": "吉他・民謠"
+  },
+  {
+   "id": "light",
+   "kind": "music",
+   "name": "輕快・Lo-fi・爵士"
+  },
+  {
+   "id": "fantasy",
+   "kind": "music",
+   "name": "奇幻・冒險"
+  },
+  {
+   "id": "musicbox",
+   "kind": "music",
+   "name": "音樂盒"
+  },
+  {
+   "id": "ambient",
+   "kind": "music",
+   "name": "氛圍・療癒"
+  },
+  {
+   "id": "water",
+   "kind": "sfx",
+   "name": "流水・噴泉"
+  },
+  {
+   "id": "rain",
+   "kind": "sfx",
+   "name": "雨聲"
+  },
+  {
+   "id": "sea",
+   "kind": "sfx",
+   "name": "海浪"
+  },
+  {
+   "id": "wind",
+   "kind": "sfx",
+   "name": "風聲"
+  },
+  {
+   "id": "birds",
+   "kind": "sfx",
+   "name": "鳥鳴・森林"
+  },
+  {
+   "id": "night",
+   "kind": "sfx",
+   "name": "夜晚・蟲鳴"
+  },
+  {
+   "id": "fire",
+   "kind": "sfx",
+   "name": "壁爐・營火"
+  },
+  {
+   "id": "chimes",
+   "kind": "sfx",
+   "name": "風鈴"
+  },
+  {
+   "id": "indoor",
+   "kind": "sfx",
+   "name": "室內・生活"
+  }
+ ],
+ "items": [
+  {
+   "id": "ia789c511023",
+   "cat": "orchestral",
+   "zh": "布拉姆斯 第一號交響曲 第二樂章",
+   "title": "Symphony No. 1 in C Minor, Op. 68 - II. Andante sostenuto",
+   "creator": "Musopen",
+   "license": "pdm",
+   "page": "https://archive.org/details/musopen-dvd-in-lossless-flac-format",
+   "url": "https://archive.org/download/musopen-dvd-in-lossless-flac-format/Brahms%20-%20Symphony%20No%201%20in%20C%20Major/Symphony%20No.%201%20in%20C%20Minor%2C%20Op.%2068%20-%20II.%20Andante%20sostenuto.flac",
+   "maxbytes": 31922008
+  },
+  {
+   "id": "iad0b3c7b46d",
+   "cat": "orchestral",
+   "zh": "布拉姆斯 第三號交響曲 第二樂章",
+   "title": "Symphony No. 3 in F Major, Op. 90 - II. Andante",
+   "creator": "Musopen",
+   "license": "pdm",
+   "page": "https://archive.org/details/musopen-dvd-in-lossless-flac-format",
+   "url": "https://archive.org/download/musopen-dvd-in-lossless-flac-format/Brahms%20-%20Symphony%20No%203/Symphony%20No.%203%20in%20F%20Major%2C%20Op.%2090%20-%20II.%20Andante.flac",
+   "maxbytes": 29783353
+  },
+  {
+   "id": "ia7ef0099c1a",
+   "cat": "orchestral",
+   "zh": "布拉姆斯 第三號交響曲 第三樂章",
+   "title": "Symphony No. 3 in F Major, Op. 90 - III. Poco allegretto",
+   "creator": "Musopen",
+   "license": "pdm",
+   "page": "https://archive.org/details/musopen-dvd-in-lossless-flac-format",
+   "url": "https://archive.org/download/musopen-dvd-in-lossless-flac-format/Brahms%20-%20Symphony%20No%203/Symphony%20No.%203%20in%20F%20Major%2C%20Op.%2090%20-%20III.%20Poco%20allegretto.flac",
+   "maxbytes": 30047842
+  },
+  {
+   "id": "ia8242f28a0e",
+   "cat": "orchestral",
+   "zh": "布拉姆斯 第四號交響曲 第二樂章",
+   "title": "Symphony No. 4 in E Minor, Op. 98 - II. Andante Moderato",
+   "creator": "Musopen",
+   "license": "pdm",
+   "page": "https://archive.org/details/musopen-dvd-in-lossless-flac-format",
+   "url": "https://archive.org/download/musopen-dvd-in-lossless-flac-format/Brahms%20-%20Symphony%20No%204%20in%20E%20minor/Symphony%20No.%204%20in%20E%20Minor%2C%20Op.%2098%20-%20II.%20Andante%20Moderato.flac",
+   "maxbytes": 32449594
+  },
+  {
+   "id": "ia75a88f408a",
+   "cat": "orchestral",
+   "zh": "葛利格 皮爾金組曲：清晨",
+   "title": "Peer Gynt Suite No. 1, Op. 46 - I. Morning",
+   "creator": "Musopen",
+   "license": "pdm",
+   "page": "https://archive.org/details/musopen-dvd-in-lossless-flac-format",
+   "url": "https://archive.org/download/musopen-dvd-in-lossless-flac-format/Grieg%20-%20Peer%20Gynt/Peer%20Gynt%20Suite%20No.%201%2C%20Op.%2046%20-%20I.%20Morning.flac",
+   "maxbytes": 37498702
+  },
+  {
+   "id": "ia729fc14a6d",
+   "cat": "orchestral",
+   "zh": "葛利格 皮爾金組曲：安妮特拉之舞",
+   "title": "Peer Gynt Suite No. 1, Op. 46 - III. Anitra's Dream",
+   "creator": "Musopen",
+   "license": "pdm",
+   "page": "https://archive.org/details/musopen-dvd-in-lossless-flac-format",
+   "url": "https://archive.org/download/musopen-dvd-in-lossless-flac-format/Grieg%20-%20Peer%20Gynt/Peer%20Gynt%20Suite%20No.%201%2C%20Op.%2046%20-%20III.%20Anitra%27s%20Dream.flac",
+   "maxbytes": 34715606
+  },
+  {
+   "id": "ia76b45618be",
+   "cat": "orchestral",
+   "zh": "孟德爾頌 義大利交響曲 第二樂章",
+   "title": "Symphon No. 4 in A Major, Op. 90 'Italian' - II. Andante con moto",
+   "creator": "Musopen",
+   "license": "pdm",
+   "page": "https://archive.org/details/musopen-dvd-in-lossless-flac-format",
+   "url": "https://archive.org/download/musopen-dvd-in-lossless-flac-format/Mendelssohn%20-%20Italian%20Symphony/Symphon%20No.%204%20in%20A%20Major%2C%20Op.%2090%20%27Italian%27%20-%20II.%20Andante%20con%20moto.flac",
+   "maxbytes": 31304312
+  },
+  {
+   "id": "iafed7254815",
+   "cat": "orchestral",
+   "zh": "孟德爾頌 蘇格蘭交響曲 第三樂章",
+   "title": "Symphony No. 3 in A Minor Scottish, Op. 56 - III. Adagio",
+   "creator": "Musopen",
+   "license": "pdm",
+   "page": "https://archive.org/details/musopen-dvd-in-lossless-flac-format",
+   "url": "https://archive.org/download/musopen-dvd-in-lossless-flac-format/Mendelssohn%20-%20Scottish%20Symphony/Symphony%20No.%203%20in%20A%20Minor%20Scottish%2C%20Op.%2056%20-%20III.%20Adagio.flac",
+   "maxbytes": 30401327
+  },
+  {
+   "id": "ia5a943444ed",
+   "cat": "orchestral",
+   "zh": "鮑羅定 中亞細亞草原",
+   "title": "In The Steppes of Central Asia",
+   "creator": "Musopen",
+   "license": "pdm",
+   "page": "https://archive.org/details/musopen-dvd-in-lossless-flac-format",
+   "url": "https://archive.org/download/musopen-dvd-in-lossless-flac-format/Borodin%20-%20In%20The%20Steppes%20Of%20Central%20Asia/In%20The%20Steppes%20of%20Central%20Asia.flac",
+   "maxbytes": 34983518
+  },
+  {
+   "id": "ia250af69ccd",
+   "cat": "orchestral",
+   "zh": "莫札特 第四十號交響曲 第一樂章",
+   "title": "1st Mov Molto allegro",
+   "creator": "Musopen",
+   "license": "pdm",
+   "page": "https://archive.org/details/musopen-dvd-in-lossless-flac-format",
+   "url": "https://archive.org/download/musopen-dvd-in-lossless-flac-format/Mozart%20-%20Symphony%20No%2040%20in%20G%20Minor_/1st%20Mov%20Molto%20allegro.flac",
+   "maxbytes": 39568184
+  },
+  {
+   "id": "e405fcf5-9e5a-43a2-a285-e6ddbe3ea6b8",
+   "cat": "orchestral",
+   "zh": "感性心靈配樂",
+   "title": "Emotional Spiritual Soundtrack - Respect",
+   "creator": "MusicByMisterbates",
+   "license": "cc0",
+   "page": "https://freesound.org/people/MusicByMisterbates/sounds/603711",
+   "url": "https://cdn.freesound.org/previews/603/603711_3968818-hq.mp3"
+  },
+  {
+   "id": "524aeb62-7bd7-43e5-9041-d07c6739d9cf",
+   "cat": "orchestral",
+   "zh": "深情弦樂",
+   "title": "Sweeping Sad Strings.wav",
+   "creator": "BuytheField",
+   "license": "cc0",
+   "page": "https://freesound.org/people/BuytheField/sounds/414442",
+   "url": "https://cdn.freesound.org/previews/414/414442_4438873-hq.mp3"
+  },
+  {
+   "id": "aea777c0-18bd-4d77-8137-158a735c449a",
+   "cat": "orchestral",
+   "zh": "海邊管弦慢板",
+   "title": "Slow Sea Orchestra Big Orchestral String Piano Myst Drama Love Cinematic Music Surround.wav",
+   "creator": "szegvari",
+   "license": "cc0",
+   "page": "https://freesound.org/people/szegvari/sounds/609900",
+   "url": "https://cdn.freesound.org/previews/609/609900_2282212-hq.mp3"
+  },
+  {
+   "id": "b80fd751-62d5-43d1-8145-12bde0f7b072",
+   "cat": "orchestral",
+   "zh": "壯闊管弦",
+   "title": "Epic Orchestra",
+   "creator": "edtijo",
+   "license": "cc0",
+   "page": "https://freesound.org/people/edtijo/sounds/218744",
+   "url": "https://cdn.freesound.org/previews/218/218744_2376154-hq.mp3"
+  },
+  {
+   "id": "iaae66087b73",
+   "cat": "piano",
+   "zh": "巴哈 郭德堡變奏曲：詠嘆調",
+   "title": "Goldberg Variations, BWV 988 - Aria",
+   "creator": "Kimiko Ishizaka（Musopen）",
+   "license": "pdm",
+   "page": "https://archive.org/details/musopen-dvd-in-lossless-flac-format",
+   "url": "https://archive.org/download/musopen-dvd-in-lossless-flac-format/Goldberg%20Variations/Goldberg%20Variations%2C%20BWV%20988%20-%20Aria.flac",
+   "maxbytes": 10307181
+  },
+  {
+   "id": "iad90507eea4",
+   "cat": "piano",
+   "zh": "蕭邦 夜曲 Op.9 No.2",
+   "title": "NocturneOp9No2",
+   "creator": "Musopen",
+   "license": "cc0",
+   "page": "https://archive.org/details/musopen-chopin",
+   "url": "https://archive.org/download/musopen-chopin/NocturneOp9No2.mp3"
+  },
+  {
+   "id": "iace2b7d6806",
+   "cat": "piano",
+   "zh": "蕭邦 夜曲 Op.15 No.1",
+   "title": "Nocturne Op. 15 no. 1 In F major",
+   "creator": "Musopen",
+   "license": "cc0",
+   "page": "https://archive.org/details/musopen-chopin",
+   "url": "https://archive.org/download/musopen-chopin/Nocturne%20Op.%2015%20no.%201%20In%20F%20major.mp3"
+  },
+  {
+   "id": "ia65616ae3fc",
+   "cat": "piano",
+   "zh": "蕭邦 E 小調夜曲（遺作）",
+   "title": "NocturneOp.72No.1InEMinor",
+   "creator": "Musopen",
+   "license": "cc0",
+   "page": "https://archive.org/details/musopen-chopin",
+   "url": "https://archive.org/download/musopen-chopin/NocturneOp.72No.1InEMinor.mp3"
+  },
+  {
+   "id": "ia4f51810efc",
+   "cat": "piano",
+   "zh": "蕭邦 夜曲 Op.27 No.1",
+   "title": "Nocturne Op. 27 no. 1 in C sharp minor",
+   "creator": "Musopen",
+   "license": "cc0",
+   "page": "https://archive.org/details/musopen-chopin",
+   "url": "https://archive.org/download/musopen-chopin/Nocturne%20Op.%2027%20no.%201%20in%20C%20sharp%20minor.mp3"
+  },
+  {
+   "id": "ia534e1b9f21",
+   "cat": "piano",
+   "zh": "蕭邦 圓舞曲 Op.64 No.2",
+   "title": "Waltz Op. 64 no. 2 in C sharp minor",
+   "creator": "Musopen",
+   "license": "cc0",
+   "page": "https://archive.org/details/musopen-chopin",
+   "url": "https://archive.org/download/musopen-chopin/Waltz%20Op.%2064%20no.%202%20in%20C%20sharp%20minor.mp3"
+  },
+  {
+   "id": "iaf73a6a626f",
+   "cat": "piano",
+   "zh": "蕭邦 圓舞曲 Op.34 No.2",
+   "title": "WaltzOp.34No.2InAMinor",
+   "creator": "Musopen",
+   "license": "cc0",
+   "page": "https://archive.org/details/musopen-chopin",
+   "url": "https://archive.org/download/musopen-chopin/WaltzOp.34No.2InAMinor.mp3"
+  },
+  {
+   "id": "iaac80587793",
+   "cat": "piano",
+   "zh": "蕭邦 圓舞曲 Op.69 No.1（告別）",
+   "title": "Waltz Op. 69 no. 1 in A flat major",
+   "creator": "Musopen",
+   "license": "cc0",
+   "page": "https://archive.org/details/musopen-chopin",
+   "url": "https://archive.org/download/musopen-chopin/Waltz%20Op.%2069%20no.%201%20in%20A%20flat%20major.mp3"
+  },
+  {
+   "id": "iae0ada5b7a2",
+   "cat": "piano",
+   "zh": "蕭邦 前奏曲 Op.28 No.15（雨滴）",
+   "title": "Prelude Op. 28 no. 15",
+   "creator": "Musopen",
+   "license": "cc0",
+   "page": "https://archive.org/details/musopen-chopin",
+   "url": "https://archive.org/download/musopen-chopin/Prelude%20Op.%2028%20no.%2015.mp3"
+  },
+  {
+   "id": "iaf74e4623b9",
+   "cat": "piano",
+   "zh": "蕭邦 前奏曲 Op.28 No.7",
+   "title": "Prelude Op. 28 no. 7",
+   "creator": "Musopen",
+   "license": "cc0",
+   "page": "https://archive.org/details/musopen-chopin",
+   "url": "https://archive.org/download/musopen-chopin/Prelude%20Op.%2028%20no.%207.mp3"
+  },
+  {
+   "id": "ia5173ac01ec",
+   "cat": "piano",
+   "zh": "蕭邦 幻想即興曲",
+   "title": "Fantasie Impromptu Op. 66",
+   "creator": "Musopen",
+   "license": "cc0",
+   "page": "https://archive.org/details/musopen-chopin",
+   "url": "https://archive.org/download/musopen-chopin/Fantasie%20Impromptu%20Op.%2066.mp3"
+  },
+  {
+   "id": "ia1308a7c5e3",
+   "cat": "piano",
+   "zh": "巴哈 平均律 C 大調前奏曲",
+   "title": "Kimiko Ishizaka - Bach- Well-Tempered Clavier, Book 1 - 01 Prelude No. 1 in C major, BWV 846",
+   "creator": "Kimiko Ishizaka",
+   "license": "pdm",
+   "page": "https://archive.org/details/bach-well-tempered-clavier-book-1",
+   "url": "https://archive.org/download/bach-well-tempered-clavier-book-1/Kimiko%20Ishizaka%20-%20Bach-%20Well-Tempered%20Clavier%2C%20Book%201%20-%2001%20Prelude%20No.%201%20in%20C%20major%2C%20BWV%20846.flac"
+  },
+  {
+   "id": "iac8d3081096",
+   "cat": "piano",
+   "zh": "巴哈 平均律 降 E 大調前奏曲",
+   "title": "Kimiko Ishizaka - Bach- Well-Tempered Clavier, Book 1 - 13 Prelude No. 7 in E-flat major, BWV 852",
+   "creator": "Kimiko Ishizaka",
+   "license": "pdm",
+   "page": "https://archive.org/details/bach-well-tempered-clavier-book-1",
+   "url": "https://archive.org/download/bach-well-tempered-clavier-book-1/Kimiko%20Ishizaka%20-%20Bach-%20Well-Tempered%20Clavier%2C%20Book%201%20-%2013%20Prelude%20No.%207%20in%20E-flat%20major%2C%20BWV%20852.flac"
+  },
+  {
+   "id": "ia25acdc0418",
+   "cat": "chamber",
+   "zh": "蕭邦 大提琴奏鳴曲 第三樂章（緩板）",
+   "title": "Sonata for Piano and Cello in G Minor, Op. 65 - III. Largo",
+   "creator": "Musopen",
+   "license": "cc0",
+   "page": "https://archive.org/details/musopen-chopin",
+   "url": "https://archive.org/download/musopen-chopin/Sonata%20for%20Piano%20and%20Cello%20in%20G%20Minor%2C%20Op.%2065%20-%20III.%20Largo.mp3"
+  },
+  {
+   "id": "iaa81dfb5a39",
+   "cat": "chamber",
+   "zh": "蕭邦 長笛與鋼琴變奏曲",
+   "title": "Variations for flute and piano",
+   "creator": "Musopen",
+   "license": "cc0",
+   "page": "https://archive.org/details/musopen-chopin",
+   "url": "https://archive.org/download/musopen-chopin/Variations%20for%20flute%20and%20piano.mp3"
+  },
+  {
+   "id": "99e10290-2808-49d8-a94f-2282b84b642c",
+   "cat": "guitar",
+   "zh": "卡伐蒂娜（古典吉他）",
+   "title": "Cavatina.wav",
+   "creator": "lotman",
+   "license": "cc0",
+   "page": "https://freesound.org/people/lotman/sounds/548013",
+   "url": "https://cdn.freesound.org/previews/548/548013_1920414-hq.mp3"
+  },
+  {
+   "id": "8dd79750-ea86-45db-9e4a-d065a8bc7cc9",
+   "cat": "guitar",
+   "zh": "卡魯里 吉他二重奏",
+   "title": "Partly played guitar duo_ 24 Duos, Op.27 No.16 – Ferdinando Carulli (1770 - 1841).wav",
+   "creator": "Finnssound",
+   "license": "cc0",
+   "page": "https://freesound.org/people/Finnssound/sounds/673727",
+   "url": "https://cdn.freesound.org/previews/673/673727_13884075-hq.mp3"
+  },
+  {
+   "id": "35679622-f57e-42c6-a93f-b413667082e3",
+   "cat": "guitar",
+   "zh": "西班牙吉他",
+   "title": "Spanish Guitar Loop",
+   "creator": "NearTheAtmoshphere",
+   "license": "cc0",
+   "page": "https://freesound.org/people/NearTheAtmoshphere/sounds/449846",
+   "url": "https://cdn.freesound.org/previews/449/449846_2578040-hq.mp3"
+  },
+  {
+   "id": "bfe8145f-86c5-48b1-99c7-ba69a0efc6c9",
+   "cat": "guitar",
+   "zh": "民謠小品",
+   "title": "folk music 4.m4a",
+   "creator": "VincentAntusch",
+   "license": "cc0",
+   "page": "https://freesound.org/people/VincentAntusch/sounds/533133",
+   "url": "https://cdn.freesound.org/previews/533/533133_7549951-hq.mp3"
+  },
+  {
+   "id": "8913c40d-f7a9-4cfb-a49a-f60f4f702680",
+   "cat": "guitar",
+   "zh": "阿肯色旅人（民謠）",
+   "title": "Arkansas Traveler.wav",
+   "creator": "ecfike",
+   "license": "cc0",
+   "page": "https://freesound.org/people/ecfike/sounds/135127",
+   "url": "https://cdn.freesound.org/previews/135/135127_2337290-hq.mp3"
+  },
+  {
+   "id": "b0d159f5-66ef-4e9b-bad9-049d1a67d682",
+   "cat": "light",
+   "zh": "Lo-fi 海灘",
+   "title": "lofi beach.ogg",
+   "creator": "hello_flowers",
+   "license": "cc0",
+   "page": "https://freesound.org/people/hello_flowers/sounds/31754",
+   "url": "https://cdn.freesound.org/previews/31/31754_199517-hq.mp3"
+  },
+  {
+   "id": "2b52dbb5-93d2-4943-851f-096a3f211248",
+   "cat": "light",
+   "zh": "Lo-fi 融合",
+   "title": "Lofi Fusion Background Music",
+   "creator": "Seth_Makes_Sounds",
+   "license": "cc0",
+   "page": "https://freesound.org/people/Seth_Makes_Sounds/sounds/655516",
+   "url": "https://cdn.freesound.org/previews/655/655516_13228046-hq.mp3"
+  },
+  {
+   "id": "59bad823-d3c7-4e78-bce4-19a63919ab8c",
+   "cat": "light",
+   "zh": "慵懶節拍",
+   "title": "Chill Beat",
+   "creator": "Seth_Makes_Sounds",
+   "license": "cc0",
+   "page": "https://freesound.org/people/Seth_Makes_Sounds/sounds/678003",
+   "url": "https://cdn.freesound.org/previews/678/678003_13228046-hq.mp3"
+  },
+  {
+   "id": "ec982276-c429-4281-9596-becfd2c9c1d2",
+   "cat": "light",
+   "zh": "放鬆節拍",
+   "title": "Real Chill Beat",
+   "creator": "Seth_Makes_Sounds",
+   "license": "cc0",
+   "page": "https://freesound.org/people/Seth_Makes_Sounds/sounds/685302",
+   "url": "https://cdn.freesound.org/previews/685/685302_13228046-hq.mp3"
+  },
+  {
+   "id": "ee507a49-f9ed-4dee-8453-0e02bba21067",
+   "cat": "light",
+   "zh": "悠閒午後",
+   "title": "chill vibe",
+   "creator": "heymanzzzz",
+   "license": "cc0",
+   "page": "https://freesound.org/people/heymanzzzz/sounds/464731",
+   "url": "https://cdn.freesound.org/previews/464/464731_9571373-hq.mp3"
+  },
+  {
+   "id": "42adca7e-4b2f-4980-83b3-4554a525df08",
+   "cat": "fantasy",
+   "zh": "冒險的國度",
+   "title": "Realm of Adventure",
+   "creator": "waxsocks",
+   "license": "cc0",
+   "page": "https://freesound.org/people/waxsocks/sounds/683938",
+   "url": "https://cdn.freesound.org/previews/683/683938_1766049-hq.mp3"
+  },
+  {
+   "id": "549c050a-1b91-44e5-8287-d0e4c821b3d1",
+   "cat": "fantasy",
+   "zh": "原聲帶：寬恕",
+   "title": "Emotional Original Soundtrack - FORGIVENESS",
+   "creator": "Magmi.Soundtracks",
+   "license": "cc0",
+   "page": "https://freesound.org/people/Magmi.Soundtracks/sounds/478246",
+   "url": "https://cdn.freesound.org/previews/478/478246_6900479-hq.mp3"
+  },
+  {
+   "id": "37502873-5f81-4e14-8fcd-c915936984e5",
+   "cat": "fantasy",
+   "zh": "起風的日子",
+   "title": "Windy day - Cinematic Fantasy Music atmo Amb soundscape.wav",
+   "creator": "szegvari",
+   "license": "cc0",
+   "page": "https://freesound.org/people/szegvari/sounds/595713",
+   "url": "https://cdn.freesound.org/previews/595/595713_2282212-hq.mp3"
+  },
+  {
+   "id": "7bb37064-a368-4b9d-b87d-9d7e6b39b48d",
+   "cat": "fantasy",
+   "zh": "力量之舞",
+   "title": "Force Dance - Orchestra Strings Brass Atmo Atmosphere Ambience Music Surround.wav",
+   "creator": "szegvari",
+   "license": "cc0",
+   "page": "https://freesound.org/people/szegvari/sounds/611098",
+   "url": "https://cdn.freesound.org/previews/611/611098_2282212-hq.mp3"
+  },
+  {
+   "id": "eaa0b4bb-5c32-4db7-937e-687655c58a34",
+   "cat": "musicbox",
+   "zh": "溫柔音樂盒",
+   "title": "gentle music box",
+   "creator": "Yuval",
+   "license": "cc0",
+   "page": "https://freesound.org/people/Yuval/sounds/210799",
+   "url": "https://cdn.freesound.org/previews/210/210799_770707-hq.mp3"
+  },
+  {
+   "id": "0ce4ed41-6112-455f-85bb-a8a64ce98e15",
+   "cat": "musicbox",
+   "zh": "搖籃曲音樂盒",
+   "title": "lullaby music box",
+   "creator": "Thejack288",
+   "license": "cc0",
+   "page": "https://freesound.org/people/Thejack288/sounds/236813",
+   "url": "https://cdn.freesound.org/previews/236/236813_2583807-hq.mp3"
+  },
+  {
+   "id": "4653c3f3-07dd-40c7-8454-b28640ca1624",
+   "cat": "musicbox",
+   "zh": "音樂盒搖籃曲",
+   "title": "Music box lullaby",
+   "creator": "csnmedia",
+   "license": "cc0",
+   "page": "https://freesound.org/people/csnmedia/sounds/381973",
+   "url": "https://cdn.freesound.org/previews/381/381973_926978-hq.mp3"
+  },
+  {
+   "id": "23d97b7c-88a6-43da-ac4a-2c05a2b7f580",
+   "cat": "musicbox",
+   "zh": "音樂盒：天鵝湖",
+   "title": "Music Box (Swan Lake)",
+   "creator": "deleted_user_4966198",
+   "license": "cc0",
+   "page": "https://freesound.org/people/deleted_user_4966198/sounds/264186",
+   "url": "https://cdn.freesound.org/previews/264/264186_4966198-hq.mp3"
+  },
+  {
+   "id": "4d30e1c7-d402-40be-9158-7f4c7bbaf775",
+   "cat": "musicbox",
+   "zh": "音樂盒：魔笛",
+   "title": "Music Box - Magic Flute, Mozart.wav",
+   "creator": "pooky1",
+   "license": "cc0",
+   "page": "https://freesound.org/people/pooky1/sounds/432152",
+   "url": "https://cdn.freesound.org/previews/432/432152_2339776-hq.mp3"
+  },
+  {
+   "id": "95b0034d-430d-41f8-85b3-477b07b586f4",
+   "cat": "musicbox",
+   "zh": "音樂盒：布拉姆斯圓舞曲",
+   "title": "Music Box - J. Brahms - Opus 39 - Waltz no 3",
+   "creator": "Flying_Deer_Fx",
+   "license": "cc0",
+   "page": "https://freesound.org/people/Flying_Deer_Fx/sounds/369405",
+   "url": "https://cdn.freesound.org/previews/369/369405_6812364-hq.mp3"
+  },
+  {
+   "id": "e1bf95de-045e-46e8-afb3-ef1131669724",
+   "cat": "musicbox",
+   "zh": "音樂盒：跳蚤圓舞曲",
+   "title": "Music Box - The Flea Waltz",
+   "creator": "Flying_Deer_Fx",
+   "license": "cc0",
+   "page": "https://freesound.org/people/Flying_Deer_Fx/sounds/369148",
+   "url": "https://cdn.freesound.org/previews/369/369148_6812364-hq.mp3"
+  },
+  {
+   "id": "953262f1-5d0f-4e57-8ea8-8d4beaabc3b5",
+   "cat": "ambient",
+   "zh": "放鬆音樂 12",
+   "title": "relaxation music #12.mp3",
+   "creator": "ZHRØ",
+   "license": "cc0",
+   "page": "https://freesound.org/people/ZHR%C3%98/sounds/522589",
+   "url": "https://cdn.freesound.org/previews/522/522589_10859468-hq.mp3"
+  },
+  {
+   "id": "5593eb26-5533-408e-bc0d-39e8df12078c",
+   "cat": "ambient",
+   "zh": "放鬆音樂 49",
+   "title": "relaxation music #49.mp3",
+   "creator": "ZHRØ",
+   "license": "cc0",
+   "page": "https://freesound.org/people/ZHR%C3%98/sounds/562732",
+   "url": "https://cdn.freesound.org/previews/562/562732_10859468-hq.mp3"
+  },
+  {
+   "id": "66b551ef-fcd6-4441-94c4-c1a6958634f6",
+   "cat": "ambient",
+   "zh": "放鬆音樂 30",
+   "title": "relaxation music #30.mp3",
+   "creator": "ZHRØ",
+   "license": "cc0",
+   "page": "https://freesound.org/people/ZHR%C3%98/sounds/534194",
+   "url": "https://cdn.freesound.org/previews/534/534194_10859468-hq.mp3"
+  },
+  {
+   "id": "e22272e0-1093-45f1-ac84-234e1edf50c3",
+   "cat": "ambient",
+   "zh": "森林小徑",
+   "title": "Road In The Forest",
+   "creator": "Andrewkn",
+   "license": "cc0",
+   "page": "https://freesound.org/people/Andrewkn/sounds/439553",
+   "url": "https://cdn.freesound.org/previews/439/439553_7038073-hq.mp3"
+  },
+  {
+   "id": "4b498380-16a2-4a21-9d5b-bc4d4c8c89ca",
+   "cat": "ambient",
+   "zh": "天空旋律",
+   "title": "Celestial Melody",
+   "creator": "waxsocks",
+   "license": "cc0",
+   "page": "https://freesound.org/people/waxsocks/sounds/554589",
+   "url": "https://cdn.freesound.org/previews/554/554589_1766049-hq.mp3"
+  },
+  {
+   "id": "590cb99f-21e3-4f18-ae24-6278818265d2",
+   "cat": "ambient",
+   "zh": "不經意",
+   "title": "Not To Notice",
+   "creator": "Andrewkn",
+   "license": "cc0",
+   "page": "https://freesound.org/people/Andrewkn/sounds/504540",
+   "url": "https://cdn.freesound.org/previews/504/504540_7038073-hq.mp3"
+  },
+  {
+   "id": "0ce95b3a-c0a6-4cf7-b54b-907eae9f6a47",
+   "cat": "ambient",
+   "zh": "沙丘",
+   "title": "Dunes",
+   "creator": "Andrewkn",
+   "license": "cc0",
+   "page": "https://freesound.org/people/Andrewkn/sounds/447511",
+   "url": "https://cdn.freesound.org/previews/447/447511_7038073-hq.mp3"
+  },
+  {
+   "id": "b401850e-83c4-4352-96b5-f29daf90120f",
+   "cat": "ambient",
+   "zh": "柔和鋼琴",
+   "title": "Soft piano.wav",
+   "creator": "Johnnie_Holiday",
+   "license": "cc0",
+   "page": "https://freesound.org/people/Johnnie_Holiday/sounds/554602",
+   "url": "https://cdn.freesound.org/previews/554/554602_4819210-hq.mp3"
+  },
+  {
+   "id": "d7fad920-6e9d-413e-b39e-68f68d1f87fb",
+   "cat": "water",
+   "zh": "溪流",
+   "title": "Water stream.",
+   "creator": "felix.blume",
+   "license": "cc0",
+   "page": "https://freesound.org/people/felix.blume/sounds/414097",
+   "url": "https://cdn.freesound.org/previews/414/414097_1661766-hq.mp3"
+  },
+  {
+   "id": "bb444988-6bc8-4c10-88a9-6df4eb9777e0",
+   "cat": "water",
+   "zh": "小河",
+   "title": "Small river water stream",
+   "creator": "klau78",
+   "license": "cc0",
+   "page": "https://freesound.org/people/klau78/sounds/556841",
+   "url": "https://cdn.freesound.org/previews/556/556841_12184473-hq.mp3"
+  },
+  {
+   "id": "082a55ea-a928-45c5-a6fe-6d88d93a47d6",
+   "cat": "water",
+   "zh": "石間潺潺流水",
+   "title": "water stream gurgling between rocks2.flac",
+   "creator": "kyles",
+   "license": "cc0",
+   "page": "https://freesound.org/people/kyles/sounds/454327",
+   "url": "https://cdn.freesound.org/previews/454/454327_612689-hq.mp3"
+  },
+  {
+   "id": "1377eb77-ed2f-497f-a598-685b7668c624",
+   "cat": "water",
+   "zh": "森林小溪",
+   "title": "small stream forest",
+   "creator": "Yuval",
+   "license": "cc0",
+   "page": "https://freesound.org/people/Yuval/sounds/197023",
+   "url": "https://cdn.freesound.org/previews/197/197023_770707-hq.mp3"
+  },
+  {
+   "id": "b42d5f8b-19cd-441e-8795-37c195f8dce0",
+   "cat": "water",
+   "zh": "低語的溪流",
+   "title": "Murmuring Stream",
+   "creator": "borralbi",
+   "license": "cc0",
+   "page": "https://freesound.org/people/borralbi/sounds/337614",
+   "url": "https://cdn.freesound.org/previews/337/337614_2774517-hq.mp3"
+  },
+  {
+   "id": "2a34f1c3-c98a-4a92-a9a4-0accd4c74607",
+   "cat": "water",
+   "zh": "持續的噴泉",
+   "title": "Constant Fountain",
+   "creator": "mhtaylor67",
+   "license": "cc0",
+   "page": "https://freesound.org/people/mhtaylor67/sounds/236980",
+   "url": "https://cdn.freesound.org/previews/236/236980_2258946-hq.mp3"
+  },
+  {
+   "id": "634e2dd6-d172-4800-9cf2-4ab8197dfe54",
+   "cat": "water",
+   "zh": "木製噴泉",
+   "title": "Wooden Fountain",
+   "creator": "Fabrizio84",
+   "license": "cc0",
+   "page": "https://freesound.org/people/Fabrizio84/sounds/458853",
+   "url": "https://cdn.freesound.org/previews/458/458853_2841496-hq.mp3"
+  },
+  {
+   "id": "16ddba2f-ec15-45d6-808d-5761377c6c2e",
+   "cat": "water",
+   "zh": "噴泉水聲",
+   "title": "Water Fountain Sound",
+   "creator": "Legnalegna55",
+   "license": "cc0",
+   "page": "https://freesound.org/people/Legnalegna55/sounds/554789",
+   "url": "https://cdn.freesound.org/previews/554/554789_10485775-hq.mp3"
+  },
+  {
+   "id": "6bcf2e2e-e93e-4eb9-ac04-06a4d00d9ad7",
+   "cat": "rain",
+   "zh": "屋內聽雨（屋頂）",
+   "title": "Rain on roof (interior perspective)",
+   "creator": "xkeril",
+   "license": "cc0",
+   "page": "https://freesound.org/people/xkeril/sounds/610543",
+   "url": "https://cdn.freesound.org/previews/610/610543_13504080-hq.mp3"
+  },
+  {
+   "id": "490ed408-6954-4919-9bc2-77d238d594dd",
+   "cat": "rain",
+   "zh": "屋頂小雨",
+   "title": "Light rain on roof",
+   "creator": "xkeril",
+   "license": "cc0",
+   "page": "https://freesound.org/people/xkeril/sounds/669484",
+   "url": "https://cdn.freesound.org/previews/669/669484_13504080-hq.mp3"
+  },
+  {
+   "id": "668f5105-67fa-45f6-8376-c2f5bb89a22e",
+   "cat": "rain",
+   "zh": "瓦片屋頂上的細雨",
+   "title": "Soft rain on a tile roof",
+   "creator": "richwise",
+   "license": "cc0",
+   "page": "https://freesound.org/people/richwise/sounds/466241",
+   "url": "https://cdn.freesound.org/previews/466/466241_1481531-hq.mp3"
+  },
+  {
+   "id": "4c7dc504-42ea-42ab-8d2f-c7d4a5aaad71",
+   "cat": "rain",
+   "zh": "庭院小雨",
+   "title": "Light rain in the garden",
+   "creator": "Cinetony",
+   "license": "cc0",
+   "page": "https://freesound.org/people/Cinetony/sounds/575378",
+   "url": "https://cdn.freesound.org/previews/575/575378_5985747-hq.mp3"
+  },
+  {
+   "id": "ba4dff0c-0b35-4d33-87b5-663b59b3c940",
+   "cat": "rain",
+   "zh": "窗上的雨",
+   "title": "rain on window",
+   "creator": "ikayuka",
+   "license": "cc0",
+   "page": "https://freesound.org/people/ikayuka/sounds/273333",
+   "url": "https://cdn.freesound.org/previews/273/273333_1158384-hq.mp3"
+  },
+  {
+   "id": "7acef8b4-9321-4c6e-a646-763af22ee85f",
+   "cat": "rain",
+   "zh": "小雨環境音",
+   "title": "light rain ambience",
+   "creator": "seth-m",
+   "license": "cc0",
+   "page": "https://freesound.org/people/seth-m/sounds/270349",
+   "url": "https://cdn.freesound.org/previews/270/270349_3366749-hq.mp3"
+  },
+  {
+   "id": "515cfaa0-3bf9-4f66-8841-ae94ad5af457",
+   "cat": "rain",
+   "zh": "小雨與遠雷",
+   "title": "05292011 Light rain thunderstorm.flac",
+   "creator": "thaighaudio",
+   "license": "cc0",
+   "page": "https://freesound.org/people/thaighaudio/sounds/121533",
+   "url": "https://cdn.freesound.org/previews/121/121533_2205380-hq.mp3"
+  },
+  {
+   "id": "b09fd453-95ae-4604-aab2-3b7c5cfb6b95",
+   "cat": "sea",
+   "zh": "平靜海浪",
+   "title": "Zen Ocean Waves,Ocean Waves Ambience.mp3",
+   "creator": "INNORECORDS",
+   "license": "cc0",
+   "page": "https://freesound.org/people/INNORECORDS/sounds/456899",
+   "url": "https://cdn.freesound.org/previews/456/456899_9518146-hq.mp3"
+  },
+  {
+   "id": "8e86e09a-db0d-490a-8d71-7a341c6dc9c5",
+   "cat": "sea",
+   "zh": "沙灘海浪",
+   "title": "Beach Waves 04.wav",
+   "creator": "DylanTheFish",
+   "license": "cc0",
+   "page": "https://freesound.org/people/DylanTheFish/sounds/463250",
+   "url": "https://cdn.freesound.org/previews/463/463250_7482766-hq.mp3"
+  },
+  {
+   "id": "64a7388a-3cba-419f-8817-479bb9f3d1d9",
+   "cat": "sea",
+   "zh": "太平洋海灘",
+   "title": "Pacific Beach.wav",
+   "creator": "microsome",
+   "license": "cc0",
+   "page": "https://freesound.org/people/microsome/sounds/209355",
+   "url": "https://cdn.freesound.org/previews/209/209355_2874677-hq.mp3"
+  },
+  {
+   "id": "3e51b9f3-67fc-4cc7-bbc3-6c25d672123d",
+   "cat": "sea",
+   "zh": "海浪與海鷗",
+   "title": "Waves and seagulls on the beach close to Lisbon",
+   "creator": "felix.blume",
+   "license": "cc0",
+   "page": "https://freesound.org/people/felix.blume/sounds/468452",
+   "url": "https://cdn.freesound.org/previews/468/468452_1661766-hq.mp3"
+  },
+  {
+   "id": "6bc8401a-2a40-4cf5-a2e9-4dc3cf07345f",
+   "cat": "sea",
+   "zh": "海浪 01",
+   "title": "ocean waves 01",
+   "creator": "rucisko",
+   "license": "cc0",
+   "page": "https://freesound.org/people/rucisko/sounds/164767",
+   "url": "https://cdn.freesound.org/previews/164/164767_2978883-hq.mp3"
+  },
+  {
+   "id": "563956ed-e029-44d7-8079-3c30c066c137",
+   "cat": "wind",
+   "zh": "樹間的風",
+   "title": "wind in the trees",
+   "creator": "deleted_user_229898",
+   "license": "cc0",
+   "page": "https://freesound.org/people/deleted_user_229898/sounds/150174",
+   "url": "https://cdn.freesound.org/previews/150/150174_229898-hq.mp3"
+  },
+  {
+   "id": "dfa810b7-d230-4d23-a40a-e3d56e6ca0d6",
+   "cat": "wind",
+   "zh": "風穿過樹林",
+   "title": "Wind Through Trees",
+   "creator": "Yoyodaman234",
+   "license": "cc0",
+   "page": "https://freesound.org/people/Yoyodaman234/sounds/335889",
+   "url": "https://cdn.freesound.org/previews/335/335889_2792951-hq.mp3"
+  },
+  {
+   "id": "fc4ca635-0e87-47b2-8d9f-b08d1b74f500",
+   "cat": "wind",
+   "zh": "風聲環境音",
+   "title": "Wind ambience",
+   "creator": "haniebal",
+   "license": "cc0",
+   "page": "https://freesound.org/people/haniebal/sounds/423314",
+   "url": "https://cdn.freesound.org/previews/423/423314_1871454-hq.mp3"
+  },
+  {
+   "id": "a843bf4e-e43f-43f2-9fd7-c79b7944a159",
+   "cat": "wind",
+   "zh": "沙漠中的風",
+   "title": "Wind in a tree in the Mojave Desert (California, USA)",
+   "creator": "felix.blume",
+   "license": "cc0",
+   "page": "https://freesound.org/people/felix.blume/sounds/187756",
+   "url": "https://cdn.freesound.org/previews/187/187756_1661766-hq.mp3"
+  },
+  {
+   "id": "0e2335ff-d7fe-41d2-976b-4f3207392955",
+   "cat": "birds",
+   "zh": "春天的鳥",
+   "title": "Birds In Spring (Scotland)",
+   "creator": "BurghRecords",
+   "license": "cc0",
+   "page": "https://freesound.org/people/BurghRecords/sounds/463903",
+   "url": "https://cdn.freesound.org/previews/463/463903_7241289-hq.mp3"
+  },
+  {
+   "id": "63219e36-1d5e-4e31-baa9-54c23d9b467c",
+   "cat": "birds",
+   "zh": "黎明鳥鳴",
+   "title": "Dawn Chorus Birdsong",
+   "creator": "squashy555",
+   "license": "cc0",
+   "page": "https://freesound.org/people/squashy555/sounds/573080",
+   "url": "https://cdn.freesound.org/previews/573/573080_1149179-hq.mp3"
+  },
+  {
+   "id": "9c53f3f3-48d1-4157-816a-5e82549769db",
+   "cat": "birds",
+   "zh": "森林鳥鳴",
+   "title": "Forest ambience with singing birds",
+   "creator": "priesjensen",
+   "license": "cc0",
+   "page": "https://freesound.org/people/priesjensen/sounds/488328",
+   "url": "https://cdn.freesound.org/previews/488/488328_8972317-hq.mp3"
+  },
+  {
+   "id": "ed82aff4-27a6-4df5-be43-99b10898ba73",
+   "cat": "birds",
+   "zh": "森林與鳥歌",
+   "title": "Forest ambient with a birdsong",
+   "creator": "unfa",
+   "license": "cc0",
+   "page": "https://freesound.org/people/unfa/sounds/160280",
+   "url": "https://cdn.freesound.org/previews/160/160280_1038806-hq.mp3"
+  },
+  {
+   "id": "81bdc2d6-aeb6-4bbd-8c0f-ceeb07120dee",
+   "cat": "birds",
+   "zh": "西班牙清晨鳥鳴",
+   "title": "Morning Birdsong, Spain",
+   "creator": "richwise",
+   "license": "cc0",
+   "page": "https://freesound.org/people/richwise/sounds/361411",
+   "url": "https://cdn.freesound.org/previews/361/361411_1481531-hq.mp3"
+  },
+  {
+   "id": "14867f16-7c6f-4595-bef4-1dbeddc8d2db",
+   "cat": "birds",
+   "zh": "晴天的森林",
+   "title": "Sunny Forest Ambience 1",
+   "creator": "deadrobotmusic",
+   "license": "cc0",
+   "page": "https://freesound.org/people/deadrobotmusic/sounds/609952",
+   "url": "https://cdn.freesound.org/previews/609/609952_11532701-hq.mp3"
+  },
+  {
+   "id": "965e8643-f8b4-40c1-8a81-b0c7a0eae0ec",
+   "cat": "night",
+   "zh": "夜晚蟋蟀",
+   "title": "Crickets Night 2",
+   "creator": "PhilllChabbb",
+   "license": "cc0",
+   "page": "https://freesound.org/people/PhilllChabbb/sounds/245834",
+   "url": "https://cdn.freesound.org/previews/245/245834_4205952-hq.mp3"
+  },
+  {
+   "id": "6a06e64a-79a7-4fb1-a9e6-5618592ca4d9",
+   "cat": "night",
+   "zh": "松林夜晚蟋蟀",
+   "title": "cricket night ambience lebanon pine forest .wav",
+   "creator": "Ramston",
+   "license": "cc0",
+   "page": "https://freesound.org/people/Ramston/sounds/580353",
+   "url": "https://cdn.freesound.org/previews/580/580353_989468-hq.mp3"
+  },
+  {
+   "id": "d2fd6602-c43d-4cd2-b443-9c843cb110cb",
+   "cat": "night",
+   "zh": "夏夜蟋蟀",
+   "title": "Cricket on Summer Night (binaural)",
+   "creator": "hargissssound",
+   "license": "cc0",
+   "page": "https://freesound.org/people/hargissssound/sounds/319372",
+   "url": "https://cdn.freesound.org/previews/319/319372_387219-hq.mp3"
+  },
+  {
+   "id": "6d89bd83-3c0c-4970-96cc-cf088a9c5290",
+   "cat": "night",
+   "zh": "鄉間夜晚蟲鳴",
+   "title": "Gentle rich cricket and insects at night rural-Lebanon .wav",
+   "creator": "The_Sound_Side",
+   "license": "cc0",
+   "page": "https://freesound.org/people/The_Sound_Side/sounds/331444",
+   "url": "https://cdn.freesound.org/previews/331/331444_989468-hq.mp3"
+  },
+  {
+   "id": "03d6d70a-ee28-4978-8b38-a9b00bb8b964",
+   "cat": "night",
+   "zh": "夜晚蛙鳴",
+   "title": "Frogs night",
+   "creator": "albertogalka",
+   "license": "cc0",
+   "page": "https://freesound.org/people/albertogalka/sounds/555209",
+   "url": "https://cdn.freesound.org/previews/555/555209_1012079-hq.mp3"
+  },
+  {
+   "id": "96ed3356-c538-44ec-ac20-9f59186210b5",
+   "cat": "night",
+   "zh": "夜晚河邊的蟲與蛙",
+   "title": "Night close to a river, crickets and frogs, bird sometimes.",
+   "creator": "felix.blume",
+   "license": "cc0",
+   "page": "https://freesound.org/people/felix.blume/sounds/466955",
+   "url": "https://cdn.freesound.org/previews/466/466955_1661766-hq.mp3"
+  },
+  {
+   "id": "077dfa8d-3541-4b63-967b-86e7bb8bc56c",
+   "cat": "fire",
+   "zh": "火爐柴火",
+   "title": "Fire in the stove",
+   "creator": "mcmikai",
+   "license": "cc0",
+   "page": "https://freesound.org/people/mcmikai/sounds/532191",
+   "url": "https://cdn.freesound.org/previews/532/532191_9735871-hq.mp3"
+  },
+  {
+   "id": "f0a84550-e663-4f41-b08e-b37177d49f8c",
+   "cat": "fire",
+   "zh": "壁爐",
+   "title": "Lit Fireplace",
+   "creator": "lurpsis",
+   "license": "cc0",
+   "page": "https://freesound.org/people/lurpsis/sounds/444127",
+   "url": "https://cdn.freesound.org/previews/444/444127_1744434-hq.mp3"
+  },
+  {
+   "id": "dff4b616-e734-4f29-bcc0-2e2263a1542d",
+   "cat": "fire",
+   "zh": "燃燒的壁爐",
+   "title": "Fireplace burning",
+   "creator": "giddster",
+   "license": "cc0",
+   "page": "https://freesound.org/people/giddster/sounds/414482",
+   "url": "https://cdn.freesound.org/previews/414/414482_1738686-hq.mp3"
+  },
+  {
+   "id": "af18388a-5a7a-4ffa-8f08-3a6cf3027ded",
+   "cat": "fire",
+   "zh": "壁爐六分鐘",
+   "title": "Fireplace for Six Minutes (Stereo)",
+   "creator": "petebuchwald",
+   "license": "cc0",
+   "page": "https://freesound.org/people/petebuchwald/sounds/496130",
+   "url": "https://cdn.freesound.org/previews/496/496130_2367139-hq.mp3"
+  },
+  {
+   "id": "d010452b-4d9c-4100-b690-f1f5f2764809",
+   "cat": "fire",
+   "zh": "森林夜晚營火",
+   "title": "campfire in a forest at night.wav",
+   "creator": "Duophonic",
+   "license": "cc0",
+   "page": "https://freesound.org/people/Duophonic/sounds/248303",
+   "url": "https://cdn.freesound.org/previews/248/248303_1001802-hq.mp3"
+  },
+  {
+   "id": "a01145da-3883-4eb5-99bb-e9cdc22f30e8",
+   "cat": "fire",
+   "zh": "劈啪柴火",
+   "title": "crackling_fire_021012.wav",
+   "creator": "sagetyrtle",
+   "license": "cc0",
+   "page": "https://freesound.org/people/sagetyrtle/sounds/145774",
+   "url": "https://cdn.freesound.org/previews/145/145774_43834-hq.mp3"
+  },
+  {
+   "id": "a018190a-e4b9-463a-a790-04876a045e51",
+   "cat": "chimes",
+   "zh": "風鈴",
+   "title": "Wind chimes 1",
+   "creator": "giddster",
+   "license": "cc0",
+   "page": "https://freesound.org/people/giddster/sounds/437337",
+   "url": "https://cdn.freesound.org/previews/437/437337_1738686-hq.mp3"
+  },
+  {
+   "id": "c1ad3cdf-c6de-40d4-9321-5c0073cc657f",
+   "cat": "chimes",
+   "zh": "風鈴聲",
+   "title": "Wind Chimes",
+   "creator": "Littleboot",
+   "license": "cc0",
+   "page": "https://freesound.org/people/Littleboot/sounds/196712",
+   "url": "https://cdn.freesound.org/previews/196/196712_652446-hq.mp3"
+  },
+  {
+   "id": "67d4ab5d-bb0e-4093-b111-8209048835a5",
+   "cat": "chimes",
+   "zh": "Koshi 風鈴",
+   "title": "Koshi Wind Chimes, Medium",
+   "creator": "Kinoton",
+   "license": "cc0",
+   "page": "https://freesound.org/people/Kinoton/sounds/378431",
+   "url": "https://cdn.freesound.org/previews/378/378431_2247456-hq.mp3"
+  },
+  {
+   "id": "20e06e37-e9ef-4bb6-ab4e-42c432922116",
+   "cat": "chimes",
+   "zh": "Koshi 風鈴（長）",
+   "title": "Koshi Wind Chime",
+   "creator": "Kinoton",
+   "license": "cc0",
+   "page": "https://freesound.org/people/Kinoton/sounds/376001",
+   "url": "https://cdn.freesound.org/previews/376/376001_2247456-hq.mp3"
+  },
+  {
+   "id": "492cf50b-0020-46a2-8706-c510771c45e4",
+   "cat": "chimes",
+   "zh": "放鬆風鈴",
+   "title": "Wind Chime relaxing stereo studio sound quality 192Khz.wav",
+   "creator": "joyvel",
+   "license": "cc0",
+   "page": "https://freesound.org/people/joyvel/sounds/656431",
+   "url": "https://cdn.freesound.org/previews/656/656431_6505336-hq.mp3"
+  },
+  {
+   "id": "6decc6c5-97b4-45bf-a21d-2b2fa0c99870",
+   "cat": "indoor",
+   "zh": "廚房掛鐘",
+   "title": "Kitchen wall clock ticking",
+   "creator": "giddster",
+   "license": "cc0",
+   "page": "https://freesound.org/people/giddster/sounds/414470",
+   "url": "https://cdn.freesound.org/previews/414/414470_1738686-hq.mp3"
+  },
+  {
+   "id": "e9be7765-7916-404e-a57d-94fafb90e1fb",
+   "cat": "indoor",
+   "zh": "客廳：時鐘、風鈴與雨",
+   "title": "Ambience - Living Room with Clocks, Wind Chimes and Rainfall",
+   "creator": "RavenWolfProds",
+   "license": "cc0",
+   "page": "https://freesound.org/people/RavenWolfProds/sounds/501008",
+   "url": "https://cdn.freesound.org/previews/501/501008_9619518-hq.mp3"
+  },
+  {
+   "id": "063230a4-ccf0-40bf-a878-d56ab606c8fb",
+   "cat": "indoor",
+   "zh": "咖啡廳",
+   "title": "cafe ambience",
+   "creator": "mikemoons",
+   "license": "cc0",
+   "page": "https://freesound.org/people/mikemoons/sounds/579500",
+   "url": "https://cdn.freesound.org/previews/579/579500_13066934-hq.mp3"
+  },
+  {
+   "id": "01b4c020-ae89-4cb1-a94a-fe239c9b9bcf",
+   "cat": "indoor",
+   "zh": "咖啡店",
+   "title": "coffee shop ambience",
+   "creator": "waweee",
+   "license": "cc0",
+   "page": "https://freesound.org/people/waweee/sounds/370973",
+   "url": "https://cdn.freesound.org/previews/370/370973_5835751-hq.mp3"
+  },
+  {
+   "id": "0b229dcf-22e3-458b-89fd-8f9a874ba3f5",
+   "cat": "indoor",
+   "zh": "酒館人聲",
+   "title": "background_chatter_tavern.wav",
+   "creator": "dazzamoo",
+   "license": "cc0",
+   "page": "https://freesound.org/people/dazzamoo/sounds/651364",
+   "url": "https://cdn.freesound.org/previews/651/651364_4219647-hq.mp3"
+  },
+  {
+   "id": "b4c43bfd-c3b0-43e3-94a7-80f23477e17e",
+   "cat": "indoor",
+   "zh": "愛爾蘭酒吧",
+   "title": "Irish pub ambiance.m4a",
+   "creator": "Talitha5",
+   "license": "cc0",
+   "page": "https://freesound.org/people/Talitha5/sounds/690595",
+   "url": "https://cdn.freesound.org/previews/690/690595_4458028-hq.mp3"
+  },
+  {
+   "id": "c7046bde-6de8-4087-82f5-95d7e9cb4a7f",
+   "cat": "indoor",
+   "zh": "廚房環境音",
+   "title": "Kitchen Ambience",
+   "creator": "heysticks",
+   "license": "cc0",
+   "page": "https://freesound.org/people/heysticks/sounds/203533",
+   "url": "https://cdn.freesound.org/previews/203/203533_2037938-hq.mp3"
+  }
+ ]
+}

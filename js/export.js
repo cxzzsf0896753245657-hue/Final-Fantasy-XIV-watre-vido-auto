@@ -35,21 +35,23 @@
     return null;
   }
 
-  /* 背景音樂：離線算出整段（含起點偏移、音量、開頭 0.5 秒淡入、結尾淡出） */
+  /* 背景音樂 + 環境音效：離線混好整段（音樂的起點偏移、音量、淡入淡出；環境音效循環） */
   async function renderMusic(total) {
-    const M = HC.state.music;
-    if (!M.url) return null;
-    const buf = await (await fetch(M.url)).arrayBuffer();
-    const decoded = await new OfflineAudioContext(2, 1, SR).decodeAudioData(buf);
-    const len = Math.ceil(total * SR);
-    const oc = new OfflineAudioContext(2, len, SR);
-    const src = oc.createBufferSource(); src.buffer = decoded;
-    const g = oc.createGain();
-    const N = Math.max(2, Math.ceil(total / 0.05)), curve = new Float32Array(N);
-    for (let i = 0; i < N; i++) curve[i] = R.music.level((i / (N - 1)) * total);
-    g.gain.setValueCurveAtTime(curve, 0, total);
-    src.connect(g); g.connect(oc.destination);
-    src.start(0, Math.min(M.off, Math.max(0, decoded.duration - 0.01)));
+    const M = HC.state.music, A = HC.state.amb;
+    if (!M.url && !A.length) return null;
+    const len = Math.ceil(total * SR), oc = new OfflineAudioContext(2, len, SR);
+    const decode = async (url) => new OfflineAudioContext(2, 1, SR).decodeAudioData(await (await fetch(url)).arrayBuffer());
+    const N = Math.max(2, Math.ceil(total / 0.05));
+    const add = (buf, levelAt, offset, loop) => {
+      const src = oc.createBufferSource(); src.buffer = buf; src.loop = loop;
+      const g = oc.createGain(), curve = new Float32Array(N);
+      for (let i = 0; i < N; i++) curve[i] = levelAt((i / (N - 1)) * total);
+      g.gain.setValueCurveAtTime(curve, 0, total);
+      src.connect(g); g.connect(oc.destination);
+      src.start(0, offset);
+    };
+    if (M.url) { const b = await decode(M.url); add(b, (T) => R.music.level(T), Math.min(M.off, Math.max(0, b.duration - 0.01)), false); }
+    for (const a of A) { try { add(await decode(a.url), (T) => R.music.ambLevel(a, T), 0, true); } catch (e) {} }
     return oc.startRendering();
   }
 
@@ -88,7 +90,7 @@
     const vc = await pickVideo(W, H, fps, S.out.rate * 1e6);
     if (!vc) throw new Error("這個瀏覽器沒有可用的影片編碼器，請改用「即時錄製」");
     let audio = null, ac = null;
-    if (S.music.url) {
+    if (R.music.has()) {
       ac = await pickAudio(vc.box);
       if (ac) audio = await renderMusic(total);
     }

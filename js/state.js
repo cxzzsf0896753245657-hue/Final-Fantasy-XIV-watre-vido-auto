@@ -14,7 +14,8 @@ window.HC = window.HC || {};
     title: { template: "classic", main: "FFXIV HOUSING", sub: "庭園 ・ Garden", info: "", font: "Noto Serif TC", size: 84, color: "#ffffff", accent: "#e9c46a", pos: "auto", line: true, dur: 5.5 },
     ending: { template: "none", main: "Thank you for watching", sub: "", info: "", dur: 4 },
     look: { filter: "none", filterStr: 1, tintStr: 1, fx: { vignette: 0, glow: 0, bokeh: 0, petals: 0, grain: 0, letterbox: 0 } },
-    music: { name: "", url: "", vol: 0.8, off: 0, fade: 3 },
+    music: { name: "", url: "", vol: 0.8, off: 0, fade: 3, lib: "" },
+    amb: [],   // 環境音效（最多 3 層，整支影片循環播放）：{ key, name, url, vol, lib }
     out: { mode: "frames", fps: 30, aspect: "16:9", res: 1080, rate: 10, fi: 1.5, fo: 2.5 },
     auto: { len: 120, rhythm: 0.4, speed: 0.8, zoom: 0.16, tol: 0.5, head: 0.5, cursor: true, ui: true, stab: true, stabStr: 0.6, learn: true, cover: true, lateral: true, gap: 8, sceneLook: 0.5, trMode: "learn", trType: "cut", order: "learn", beat: true },
   };

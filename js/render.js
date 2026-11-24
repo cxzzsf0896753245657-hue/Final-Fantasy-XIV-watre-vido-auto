@@ -267,10 +267,29 @@
   // 播放結束（或素材載入失敗中斷）時通知匯出流程，避免一直等下去
   function finishHooks() { const h = waitHooks; waitHooks = null; h && h.done && h.done(); }
 
-  /* ---------- 背景音樂 ---------- */
+  /* ---------- 背景音樂 + 環境音效 ----------
+     音樂一條，環境音效最多 3 層（循環播放、開頭 1.5 秒淡入、結尾跟音樂一起淡出） */
   const au = new Audio();
   au.preload = "auto";
   let actx = null, gain = null, dest = null, held = false;
+  const layers = new Map();   // 環境音效 key -> { au, gain }
+  const fadeOut = (T, total, f) => (f > 0 && T > total - f ? HC.clamp((total - T) / f, 0, 1) : 1);
+  function layer(a) {
+    let L = layers.get(a.key);
+    if (!L) {
+      const el = new Audio(); el.loop = true; el.preload = "auto";
+      const g = actx.createGain(), src = actx.createMediaElementSource(el);
+      src.connect(g); g.connect(actx.destination); g.connect(dest);
+      L = { au: el, gain: g }; layers.set(a.key, L);
+    }
+    if (L.au.src !== a.url) L.au.src = a.url;
+    return L;
+  }
+  const ambTime = (L, T) => (L.au.duration > 0 ? T % L.au.duration : T);
+  function dropLayers() {
+    const keep = new Set(HC.state.amb.map((a) => a.key));
+    for (const [k, L] of layers) if (!keep.has(k)) { L.au.pause(); L.au.removeAttribute("src"); L.gain.disconnect(); layers.delete(k); }
+  }
   R.music = {
     el: au,
     ensure() {
@@ -282,31 +301,55 @@
       src.connect(gain); gain.connect(actx.destination); gain.connect(dest);
     },
     stream() { this.ensure(); return dest.stream; },
+    has: () => !!HC.state.music.url || HC.state.amb.length > 0,
     level(T) {
       const M = HC.state.music, { total } = HC.timeline();
-      let g = M.vol;
-      if (M.fade > 0 && T > total - M.fade) g *= HC.clamp((total - T) / M.fade, 0, 1);
+      let g = M.vol * fadeOut(T, total, M.fade);
       if (T < 0.5) g *= T / 0.5;
       return g;
     },
+    ambLevel(a, T) {
+      const { total } = HC.timeline();
+      return a.vol * fadeOut(T, total, Math.max(1.5, HC.state.music.fade)) * HC.clamp(T / 1.5, 0, 1);
+    },
     start(T) {
       const M = HC.state.music;
-      if (!M.url) return;
+      if (!this.has()) return;
       this.ensure();
       actx.resume && actx.resume();
-      if (au.src !== M.url) au.src = M.url;
-      au.currentTime = M.off + T;
-      gain.gain.value = this.level(T);
-      au.play().catch(() => {});
+      dropLayers();
+      if (M.url) {
+        if (au.src !== M.url) au.src = M.url;
+        au.currentTime = M.off + T;
+        gain.gain.value = this.level(T);
+        au.play().catch(() => {});
+      }
+      for (const a of HC.state.amb) {
+        const L = layer(a);
+        L.au.currentTime = ambTime(L, T); L.gain.gain.value = this.ambLevel(a, T);
+        L.au.play().catch(() => {});
+      }
     },
     sync(T) {
       const M = HC.state.music;
-      if (!M.url || !actx || held) return;
-      gain.gain.value = this.level(T);
-      if (Math.abs(au.currentTime - (M.off + T)) > 0.2) au.currentTime = M.off + T;
+      if (!actx || held) return;
+      if (M.url) {
+        gain.gain.value = this.level(T);
+        if (Math.abs(au.currentTime - (M.off + T)) > 0.2) au.currentTime = M.off + T;
+      }
+      for (const a of HC.state.amb) {
+        const L = layers.get(a.key); if (!L) continue;
+        L.gain.gain.value = this.ambLevel(a, T);
+        const want = ambTime(L, T);
+        if (Math.abs(L.au.currentTime - want) > 0.35 && Math.abs(L.au.currentTime - want) < (L.au.duration || 1e9) - 0.35) L.au.currentTime = want;
+      }
     },
-    hold(on) { held = on; if (!HC.state.music.url) return; on ? au.pause() : au.play().catch(() => {}); },
-    stop() { au.pause(); },
+    hold(on) {
+      held = on;
+      const all = [HC.state.music.url ? au : null, ...[...layers.values()].map((L) => L.au)].filter(Boolean);
+      for (const el of all) on ? el.pause() : el.play().catch(() => {});
+    },
+    stop() { au.pause(); for (const L of layers.values()) L.au.pause(); },
   };
 
   /* ---------- 匯出 ---------- */
@@ -326,7 +369,7 @@
     const H0w = canvas.width, sz = HC.outSize();
     canvas.width = sz.W; canvas.height = sz.H;
     const stream = canvas.captureStream(30);
-    if (S.music.url) for (const tr of R.music.stream().getAudioTracks()) stream.addTrack(tr);
+    if (R.music.has()) for (const tr of R.music.stream().getAudioTracks()) stream.addTrack(tr);
     const rec = new MediaRecorder(stream, { mimeType: mime || undefined, videoBitsPerSecond: S.out.rate * 1e6, audioBitsPerSecond: 192000 });
     const chunks = [];
     rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };

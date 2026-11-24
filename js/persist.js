@@ -77,7 +77,11 @@
     load: () => get("proj", "current"),
     clear: () => { last = ""; return del("proj", "current"); },
     mark: (j) => { last = j; },
-    saveMusic: (f) => put("proj", "music", { name: f.name, blob: f }),
+    // 音樂庫的音樂只記編號，自己的音樂檔才存檔案本身
+    saveMusic: (f, lib) => put("proj", "music", lib ? { name: f.name, lib } : { name: f.name, blob: f }),
+    saveAmb: (key, name, blob) => put("proj", "amb:" + key, { name, blob }),
+    dropAmb: (key) => del("proj", "amb:" + key),
+    amb: (key) => get("proj", "amb:" + key),
     music: () => get("proj", "music"),
     clearMusic: () => del("proj", "music"),
   };
