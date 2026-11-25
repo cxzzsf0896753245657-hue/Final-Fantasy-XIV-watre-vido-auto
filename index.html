@@ -32,6 +32,7 @@
 <main class="work">
   <section class="bin" aria-label="素材">
     <div class="phead"><h2>素材</h2><span id="binCount" class="muted"></span></div>
+    <div class="pickbar hidden" id="pickBar"><span id="pickInfo"></span><button class="lnk" id="pickAll">全選</button><button class="lnk" id="pickNone">全不選</button></div>
     <div id="binList" class="binlist"></div>
     <label class="drop" id="drop" for="fileIn">
       <strong>把錄好的素材拖進來</strong>
@@ -42,6 +43,8 @@
   <section class="stage" aria-label="預覽">
     <div class="screen">
       <canvas id="view" width="1920" height="1080"></canvas>
+      <span class="stagetag hidden" id="stageTag">成品預覽</span>
+      <div class="stageempty" id="stageEmpty"><b>還沒有剪好的影片</b><span>① 把素材拖進左邊 → ② 勾選要用的素材 → ③ 按上方「自動剪輯」<br>剪好的成品會出現在這裡和下方的時間軸。</span></div>
       <div id="overlay" class="overlay hidden"></div>
     </div>
     <div class="transport">
@@ -157,7 +160,8 @@
         </div>
       </div>
       <div id="srcPanel" class="form hidden">
-        <p class="clipname" id="srcName"></p>
+        <div class="srchead"><p class="clipname" id="srcName"></p><button class="btn" id="srcClose" title="關閉素材檢視，回到成品">✕ 回到成品</button></div>
+        <p class="hint">你正在看原始素材（不是剪好的成品）。可以從這裡手動挑片段加到時間軸。</p>
         <video id="srcVid" controls muted playsinline></video>
         <div class="graph" id="srcGraphWrap"><canvas id="srcGraph" height="64"></canvas></div>
         <p class="legend"><i class="lg s"></i>靜止 <i class="lg m"></i>運鏡 <i class="lg f"></i>太快／晃 <i class="lg c"></i>有鼠標 <i class="lg u"></i>有遊戲介面 <i class="lg x"></i>已排除</p>
@@ -370,6 +374,10 @@
   </aside>
 
   <section class="tl" aria-label="時間軸">
+    <div class="resultbar hidden" id="resultBar" role="status">
+      <span class="ok">✓</span><span id="resultText"></span>
+      <button class="btn primary" id="resPlay">▶ 播放成品</button><button class="btn" id="resAgain" title="用同樣的素材再剪一次（會換不同的片段）">重新剪</button><button class="btn" id="resExport">匯出影片</button><button class="lnk" id="resClose" aria-label="關閉">✕</button>
+    </div>
     <div class="tlhead">
       <h2>時間軸</h2><span id="tlInfo" class="muted"></span>
       <details class="keys"><summary>快捷鍵</summary>

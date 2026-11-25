@@ -4,7 +4,7 @@
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const MODE = { path: "路徑", move: "原運鏡", in: "推近", out: "拉遠", panR: "右移", panL: "左移", panU: "上移", panD: "下移", none: "靜止" };
-  let sel = null, srcClip = null, analyzing = false;
+  let sel = null, srcClip = null, analyzing = false, lastPick = null;
   const selSet = new Set();   // 多選：被選取的鏡頭 id
   const targets = () => S().shots.filter((s) => selSet.has(s.id));
   const idxOf = (id) => S().shots.findIndex((x) => x.id === id);
@@ -81,9 +81,10 @@
   }
   function afterAnalysis() {
     const ready = S().clips.some((c) => c.ana);
-    $("autoBtn").disabled = $("autoBtn2").disabled = !ready;
-    if (ready && !S().shots.length) { runAuto(true); toast("分析完成，已自動剪好第一版"); }
+    if (pendingAuto && !picked().some((c) => !c.ana)) { pendingAuto = false; runAuto(); }
+    else if (ready && !S().shots.length) toast("素材分析完成：勾選要用的素材，按上方「自動剪輯」");
     else if (ready) { toast("素材分析完成"); renderTimeline(); seek(R.T); }
+    renderPick();
     if (S().out.proxy) makeProxies();
   }
 
@@ -102,7 +103,9 @@
     };
     $("binList").innerHTML = (nMiss ? `<div class="relink"><span>還有 ${nMiss} 支素材沒有檔案</span><button class="btn" id="relinkBtn">找回素材檔</button></div>` : "") + cs.map((c, i) => (nScene > 1 && (!i || c.scene !== cs[i - 1].scene) ? `
       <div class="scene"><span>場景 ${c.scene + 1}${c.sceneWhy ? `<small>${WHY[c.sceneWhy]}</small>` : ""}</span>${todBtn(c.scene)}${typeSel(c.scene)}${i ? `<button data-join="${c.id}" title="把這個場景併回上一個場景">併回上一個</button>` : ""}</div>` : "") + `
-      <div class="clip ${srcClip === c ? "on" : ""}" data-id="${c.id}" tabindex="0" role="button">${i && c.scene === cs[i - 1].scene ? `<button class="split" data-split="${c.id}" title="從這支素材開始新的場景" aria-label="從這支素材開始新的場景">分場景</button>` : ""}
+      <div class="clip ${srcClip === c ? "on" : ""} ${c.pick === false ? "off" : ""}" data-id="${c.id}" tabindex="0" role="checkbox" aria-checked="${c.pick !== false}" title="點一下：選取／取消（自動剪輯只用勾選的素材）">
+        <input type="checkbox" class="pick" data-pick="${c.id}" ${c.pick !== false ? "checked" : ""} aria-label="用這支素材自動剪輯">
+        <button class="view" data-view="${c.id}" title="看這支素材、手動挑片段">看素材</button>${i && c.scene === cs[i - 1].scene ? `<button class="split" data-split="${c.id}" title="從這支素材開始新的場景" aria-label="從這支素材開始新的場景">分場景</button>` : ""}
         <img alt="" data-thumb="${c.id}">
         <div><div class="nm" title="${esc(c.name)}">${esc(label(c))}</div>
         <div class="meta" data-meta="${c.id}">${esc(meta(c))}</div>
@@ -113,6 +116,22 @@
       HC.thumb(c, 1.5).then((u) => { if (u && img) img.src = u; });
     }
     $("drop").querySelector("strong").textContent = cs.length ? "再加入素材" : "把錄好的素材拖進來";
+    renderPick();
+  }
+  /* 勾選的素材 → 自動剪輯按鈕 */
+  let pendingAuto = false;
+  const picked = () => S().clips.filter((c) => c.pick !== false && !c.missing && c.status !== "error");
+  function renderPick() {
+    const cs = S().clips, p = picked(), wait = p.filter((c) => !c.ana).length;
+    $("pickBar").classList.toggle("hidden", !cs.length);
+    $("pickInfo").textContent = `已選 ${p.length}／${cs.length} 支`;
+    const lbl = pendingAuto ? `分析完就開始剪…（還有 ${wait} 支）` : p.length ? `自動剪輯（${p.length} 支素材）` : "自動剪輯";
+    $("autoBtn").textContent = lbl;
+    $("autoBtn").disabled = !p.length || pendingAuto;
+    $("autoBtn2").disabled = !p.length || pendingAuto;
+    $("autoBtn").classList.toggle("pulse", !!p.length && !S().shots.length && !pendingAuto && !wait);
+    $("stageEmpty").classList.toggle("hidden", !!S().shots.length);
+    $("stageTag").classList.toggle("hidden", !S().shots.length);
   }
   /* 檔名有拍攝時間就顯示時間，比較好認 */
   function label(c) {
@@ -148,6 +167,12 @@
   }
 
   /* ---------- 原始素材檢視 ---------- */
+  function closeSource() {
+    if (!srcClip) return;
+    srcClip = null; $("srcVid").pause(); $("srcPanel").classList.add("hidden");
+    if (!sel && !selItem) $("shotEmpty").classList.remove("hidden");
+    renderBin();
+  }
   function openSource(c, t) {
     if (!c || c.missing) return toast("這支素材還沒匯入");
     srcClip = c;
@@ -408,6 +433,7 @@
     $("scrub").max = Math.max(1, Math.round(total * 10));
     renderBeatInfo();
     renderLanes();
+    renderPick();
     movePlayhead(R.T);
   }
 
@@ -630,13 +656,29 @@
 
   /* ---------- 自動剪輯 ---------- */
   function runAuto(silent) {
-    if (!S().clips.some((c) => c.ana)) return;
+    const p = picked();
+    if (!p.length) return toast("先在左邊勾選要用的素材");
+    if (p.some((c) => !c.ana)) {   // 還在分析：分析完自動開始
+      pendingAuto = true; renderPick();
+      toast(`還有 ${p.filter((c) => !c.ana).length} 支素材在分析，分析完會自動開始剪`);
+      return;
+    }
     if (S().shots.length) HC.commit();
     R.stop();
     HC.autoEdit();
     afterNewTimeline();
     HC.tasteAfterAuto && HC.tasteAfterAuto();
-    if (!silent) toast(`自動剪輯完成：${S().shots.length} 個鏡頭，${HC.fmt(HC.timeline().total)}` + (HC.lastDedupe ? `（去掉 ${HC.lastDedupe} 個重複角度）` : ""));
+    showResult(p.length, silent);
+  }
+  /* 剪好了：在時間軸上方說明結果，畫面切到成品 */
+  function showResult(nClips, silent) {
+    closeSource();
+    const n = S().shots.length, used = new Set(S().shots.map((s) => s.clipId)).size;
+    $("resultText").innerHTML = `剪好了：${nClips} 支素材剪成 <b>${n} 個鏡頭</b>、共 <b>${HC.fmt(HC.timeline().total)}</b>${used < nClips ? `（${nClips - used} 支沒有適合的片段）` : ""}${HC.lastDedupe ? `，去掉 ${HC.lastDedupe} 個重複角度` : ""}。上面的畫面就是成品，下方時間軸可以拖曳調整。`;
+    $("resultBar").classList.remove("hidden");
+    const tl = document.querySelector(".tl"); tl.classList.remove("flash"); void tl.offsetWidth; tl.classList.add("flash");
+    renderPick();
+    if (!silent) toast(`自動剪輯完成：${n} 個鏡頭，${HC.fmt(HC.timeline().total)}`);
   }
   function afterNewTimeline() {
     bestSection();
@@ -766,7 +808,7 @@
     const s = S();
     return JSON.stringify({
       app: "housing-cut", version: 1, name: $("projName").value,
-      clips: s.clips.map((c) => ({ id: c.id, name: c.name, time: c.time, dur: c.dur, excluded: c.excluded, sceneMark: c.sceneMark || "", stype: c.stype || "", tod: c.tod || "" })),
+      clips: s.clips.map((c) => ({ id: c.id, name: c.name, time: c.time, dur: c.dur, excluded: c.excluded, sceneMark: c.sceneMark || "", stype: c.stype || "", tod: c.tod || "", pick: c.pick !== false })),
       shots: s.shots, title: s.title, ending: s.ending, look: s.look, out: s.out, auto: s.auto, wm: { ...s.wm, _img: undefined },
       music: { name: s.music.name, vol: s.music.vol, off: s.music.off, fade: s.music.fade, lib: s.music.lib || "", at: s.music.at || 0, len: s.music.len || 0 },
       texts: s.texts || [], fxItems: s.fxItems || [],
@@ -781,8 +823,8 @@
     const keep = new Map(s.clips.map((c) => [c.name, c]));
     s.clips = o.clips.map((c) => {
       const have = keep.get(c.name);
-      if (have) { have.excluded = c.excluded || []; have.sceneMark = c.sceneMark || ""; have.stype = c.stype || ""; have.tod = c.tod || ""; const old = have.id; for (const sh of o.shots) if (sh.clipId === c.id) sh.clipId = old; return have; }
-      return { id: c.id, name: c.name, time: c.time, dur: c.dur, excluded: c.excluded || [], sceneMark: c.sceneMark || "", stype: c.stype || "", tod: c.tod || "", missing: true };
+      if (have) { have.excluded = c.excluded || []; have.sceneMark = c.sceneMark || ""; have.stype = c.stype || ""; have.tod = c.tod || ""; have.pick = c.pick !== false; const old = have.id; for (const sh of o.shots) if (sh.clipId === c.id) sh.clipId = old; return have; }
+      return { id: c.id, name: c.name, time: c.time, dur: c.dur, excluded: c.excluded || [], sceneMark: c.sceneMark || "", stype: c.stype || "", tod: c.tod || "", pick: c.pick !== false, missing: true };
     });
     s.shots = o.shots.map(HC.migrateShot); Object.assign(s.title, o.title); Object.assign(s.out, o.out); Object.assign(s.auto, o.auto);
     if (o.title && o.title.show === false) s.title.template = "none";
@@ -1108,12 +1150,13 @@
   }
   /* ---------- 第一次使用的導覽 ---------- */
   const TOUR = [
-    ["label[for=fileIn]", "1. 匯入素材", "把遊戲錄的影片拖進來或按這裡。分析完會自動剪好第一版；有鼠標、遊戲介面的畫面會自動避開。"],
-    ["#autoBtn", "2. 自動剪輯", "隨時可以重新自動剪輯。「自動剪輯」分頁還能「做 3 個版本讓我挑」、產生短影音版。"],
-    [".tl", "3. 時間軸", "點鏡頭看設定；拖邊緣修剪長度、按 S 分割、Ctrl／Shift 多選。拖鏡頭可以換順序。"],
-    [".side", "4. 右邊的分頁", "鏡頭效果、轉場、開頭片尾、濾鏡、音樂庫（免費音樂和環境音）、學習、匯出都在這裡。"],
-    ["#libMusicBtn", "5. 音樂和環境音", "內建 100 多首免費音樂、音效，也會依畫面推薦。", "music"],
-    ["#exportBtn", "6. 匯出", "預設逐格輸出，不會掉格。「匯出」分頁有 YouTube、Shorts、IG 的預設，還能產生封面圖和章節。"],
+    ["label[for=fileIn]", "1. 匯入素材", "把遊戲錄的影片拖進來或按這裡，可以一次放很多支。有鼠標、遊戲介面的畫面會自動避開。"],
+    [".bin", "2. 勾選要用的素材", "點素材就能勾選／取消（Shift+點 連續選）。「看素材」可以手動挑片段。"],
+    ["#autoBtn", "3. 自動剪輯", "按下去，就用勾選的素材剪成一支影片。「自動剪輯」分頁還能「做 3 個版本讓我挑」、產生短影音版。"],
+    [".tl", "4. 成品在這裡", "剪好的成品出現在中間的預覽和下方的時間軸。拖鏡頭換順序、拖邊緣修剪長度；文字、特效、音樂各一軌。"],
+    [".side", "5. 右邊的分頁", "鏡頭效果、轉場、開頭片尾、濾鏡、音樂庫（免費音樂和環境音）、學習、匯出都在這裡。"],
+    ["#libMusicBtn", "6. 音樂和環境音", "內建 100 多首免費音樂、音效，也會依畫面推薦。", "music"],
+    ["#exportBtn", "7. 匯出", "預設逐格輸出，不會掉格。「匯出」分頁有 YouTube、Shorts、IG 的預設，還能產生封面圖和章節。"],
   ];
   function tour(k = 0) {
     document.querySelector(".tour") && document.querySelector(".tour").remove();
@@ -1228,14 +1271,35 @@
         return;
       }
       if (binDragDone > performance.now() - 300) return;   // 剛剛是拖曳，不是點擊
-      const el = e.target.closest(".clip"); if (el) openSource(HC.clip(el.dataset.id));
+      const vw = e.target.closest("[data-view]"); if (vw) { openSource(HC.clip(vw.dataset.view)); return; }
+      if (e.target.closest("[data-pick]")) return;   // 勾選框自己處理（change）
+      const el = e.target.closest(".clip"); if (!el) return;
+      const c = HC.clip(el.dataset.id);
+      // Shift+點：連續選一段
+      if (e.shiftKey && lastPick) { const cs = S().clips, a = cs.indexOf(lastPick), b = cs.indexOf(c), on = lastPick.pick !== false; for (let i = Math.min(a, b); i <= Math.max(a, b); i++) cs[i].pick = on; }
+      else c.pick = c.pick === false;
+      lastPick = c; renderBin();
     });
+    $("binList").addEventListener("dblclick", (e) => { const el = e.target.closest(".clip"); if (el && !e.target.closest("button,input,select")) openSource(HC.clip(el.dataset.id)); });
+    $("srcClose").onclick = closeSource;
+    $("pickAll").onclick = () => { for (const c of S().clips) c.pick = true; renderBin(); };
+    $("pickNone").onclick = () => { for (const c of S().clips) c.pick = false; renderBin(); };
+    $("resPlay").onclick = () => { closeSource(); R.stop(); HC.stabQueue(stabDone); R.play(0); };
+    $("resAgain").onclick = () => runAuto();
+    $("resExport").onclick = () => showTab("export");
+    $("resClose").onclick = () => $("resultBar").classList.add("hidden");
     $("binList").addEventListener("change", (e) => {
+      const pk = e.target.closest("[data-pick]");
+      if (pk) { const c = HC.clip(pk.dataset.pick); c.pick = pk.checked; lastPick = c; renderBin(); return; }
       const t = e.target.closest("[data-stype]"); if (!t) return;
       HC.commit(); HC.setSceneType(+t.dataset.stype, t.value); renderBin(); renderLearn();
       toast(t.value ? `已標成「${HC.SCENE_TYPES[t.value]}」，之後會分開學這類場景的剪法` : "已取消類型");
     });
-    $("binList").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.target.closest("button")) { const el = e.target.closest(".clip"); if (el) openSource(HC.clip(el.dataset.id)); } });
+    $("binList").addEventListener("keydown", (e) => {
+      const el = e.target.closest(".clip"); if (!el || e.target.closest("button,input,select")) return;
+      if (e.key === "Enter") openSource(HC.clip(el.dataset.id));
+      else if (e.key === " ") { e.preventDefault(); const c = HC.clip(el.dataset.id); c.pick = c.pick === false; renderBin(); document.querySelector(`.clip[data-id="${c.id}"]`)?.focus(); }
+    });
 
     // 原始素材
     const v = $("srcVid");

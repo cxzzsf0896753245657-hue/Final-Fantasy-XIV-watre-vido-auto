@@ -124,7 +124,7 @@
     if (over) { Object.assign(opt, over); if (over.T) Object.assign(T, over.T); }
     HC.sortClips();
     HC.computeScenes();
-    const clips = S.clips.filter((c) => c.ana);
+    const clips = S.clips.filter((c) => c.ana && c.pick !== false);   // 只用你勾選的素材
     const order = new Map(clips.map((c, i) => [c.id, i]));
     let cands = [];
     for (const c of clips) cands = cands.concat(HC.segmentClip(c, opt));
